@@ -1,0 +1,1791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Iron Log">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f172a'/%3E%3Cg fill='%2338bdf8'%3E%3Crect x='96' y='208' width='64' height='96' rx='8'/%3E%3Crect x='352' y='208' width='64' height='96' rx='8'/%3E%3Crect x='160' y='232' width='192' height='48' rx='8'/%3E%3Crect x='72' y='224' width='24' height='64' rx='6'/%3E%3Crect x='416' y='224' width='24' height='64' rx='6'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='96' fill='%230f172a'/%3E%3Cg fill='%2338bdf8'%3E%3Crect x='96' y='208' width='64' height='96' rx='8'/%3E%3Crect x='352' y='208' width='64' height='96' rx='8'/%3E%3Crect x='160' y='232' width='192' height='48' rx='8'/%3E%3Crect x='72' y='224' width='24' height='64' rx='6'/%3E%3Crect x='416' y='224' width='24' height='64' rx='6'/%3E%3C/g%3E%3C/svg%3E">
+<title>Iron Log</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --border: #475569;
+    --text: #f1f5f9;
+    --text2: #94a3b8;
+    --accent: #3b82f6;
+    --accent2: #2563eb;
+    --green: #22c55e;
+    --green-dim: #166534;
+    --orange: #f97316;
+    --red: #ef4444;
+    --yellow: #eab308;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    -webkit-tap-highlight-color: transparent;
+    padding-bottom: 80px;
+  }
+
+  /* Top bar */
+  .topbar {
+    position: sticky; top: 0; z-index: 100;
+    background: var(--bg);
+    border-bottom: 1px solid var(--surface2);
+    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .topbar h1 { font-size: 20px; font-weight: 700; }
+  .topbar-right { display: flex; gap: 8px; }
+
+  /* Bottom nav */
+  .bottomnav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+    background: var(--surface);
+    border-top: 1px solid var(--surface2);
+    display: flex; justify-content: space-around;
+    padding: 8px 0 max(8px, env(safe-area-inset-bottom));
+  }
+  .nav-item {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: none; border: none; color: var(--text2);
+    font-size: 10px; padding: 4px 12px; cursor: pointer;
+  }
+  .nav-item.active { color: var(--accent); }
+  .nav-item svg { width: 24px; height: 24px; }
+
+  /* Pages */
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 12px;
+  }
+  .card-title { font-size: 16px; font-weight: 600; }
+  .card-subtitle { font-size: 13px; color: var(--text2); }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-secondary { background: var(--surface2); color: var(--text); }
+  .btn-success { background: var(--green); color: white; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-block { width: 100%; }
+  .btn-icon {
+    width: 36px; height: 36px; padding: 0;
+    border-radius: 8px; background: var(--surface2);
+    border: none; color: var(--text); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Exercise row in workout */
+  .exercise-block { margin-bottom: 20px; }
+  .exercise-name {
+    font-size: 15px; font-weight: 600; margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .exercise-tag {
+    font-size: 10px; font-weight: 600; padding: 2px 6px;
+    border-radius: 4px; text-transform: uppercase;
+  }
+  .tag-main { background: var(--accent); color: white; }
+  .tag-accessory { background: var(--surface2); color: var(--text2); }
+  .exercise-target {
+    font-size: 13px; color: var(--text2); margin-bottom: 8px;
+  }
+  .sets-grid {
+    display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 6px;
+    align-items: center;
+  }
+  .set-label {
+    font-size: 12px; color: var(--text2); font-weight: 600;
+    width: 32px; text-align: center;
+  }
+  .set-input {
+    background: var(--bg);
+    border: 1px solid var(--surface2);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 8px 10px;
+    text-align: center;
+    width: 100%;
+    -webkit-appearance: none;
+  }
+  .set-input:focus { border-color: var(--accent); outline: none; }
+  .set-check {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid var(--surface2);
+    background: none;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: transparent;
+    transition: all 0.15s;
+  }
+  .set-check.done {
+    border-color: var(--green);
+    background: var(--green);
+    color: white;
+  }
+  .set-header {
+    font-size: 11px; color: var(--text2); text-align: center; font-weight: 600;
+  }
+
+  /* Progress badge */
+  .progress-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 12px; font-weight: 600; padding: 3px 8px;
+    border-radius: 6px;
+  }
+  .badge-up { background: rgba(34,197,94,0.15); color: var(--green); }
+  .badge-same { background: rgba(148,163,184,0.15); color: var(--text2); }
+  .badge-down { background: rgba(239,68,68,0.15); color: var(--red); }
+
+  /* History list */
+  .history-item {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--surface2);
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-date { font-size: 14px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .history-exercises { font-size: 13px; color: var(--text2); line-height: 1.6; }
+  .day-badge {
+    font-size: 11px; font-weight: 700; padding: 2px 8px;
+    border-radius: 4px;
+  }
+  .day-a { background: rgba(59,130,246,0.2); color: var(--accent); }
+  .day-b { background: rgba(249,115,22,0.2); color: var(--orange); }
+
+  /* Progress page */
+  .lift-progress { margin-bottom: 24px; }
+  .lift-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+  .lift-current { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+  .progress-bar-bg {
+    height: 6px; background: var(--surface2); border-radius: 3px;
+    overflow: hidden; margin-bottom: 4px;
+  }
+  .progress-bar-fill {
+    height: 100%; border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--green));
+    transition: width 0.5s;
+  }
+
+  /* Chart area */
+  .chart-container {
+    width: 100%; height: 200px;
+    position: relative; margin-top: 12px;
+  }
+  canvas { width: 100% !important; height: 100% !important; }
+
+  /* Notes input */
+  .notes-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+  }
+  .notes-input:focus { border-color: var(--accent); outline: none; }
+
+  /* Timer */
+  .rest-timer {
+    position: fixed; bottom: 72px; left: 16px; right: 16px;
+    background: var(--surface);
+    border: 1px solid var(--surface2);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    display: none; align-items: center; justify-content: space-between;
+    z-index: 90;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+  }
+  .rest-timer.show { display: flex; }
+  .timer-display { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .timer-label { font-size: 12px; color: var(--text2); }
+
+  /* Workout summary */
+  .summary-stat {
+    text-align: center; padding: 16px;
+  }
+  .summary-stat .value { font-size: 28px; font-weight: 700; }
+  .summary-stat .label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* Section headers */
+  .section-header {
+    font-size: 13px; font-weight: 700; color: var(--text2);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin: 20px 0 12px;
+  }
+  .section-header:first-child { margin-top: 0; }
+
+  /* Workout day indicator */
+  .workout-indicator {
+    text-align: center; padding: 20px 0 12px;
+  }
+  .workout-day-label {
+    font-size: 32px; font-weight: 800; margin-bottom: 4px;
+  }
+  .workout-day-label.day-a-text { color: var(--accent); }
+  .workout-day-label.day-b-text { color: var(--orange); }
+  .workout-date { font-size: 14px; color: var(--text2); }
+
+  /* Toggle */
+  .toggle-row {
+    display: flex; gap: 8px; margin-bottom: 16px;
+  }
+  .toggle-btn {
+    flex: 1; padding: 10px;
+    border: 1px solid var(--surface2);
+    background: var(--surface);
+    color: var(--text2);
+    border-radius: 8px;
+    font-size: 14px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle-btn.active {
+    border-color: var(--accent);
+    background: rgba(59,130,246,0.15);
+    color: var(--accent);
+  }
+
+  /* Scrollable */
+  .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* Empty state */
+  .empty-state {
+    text-align: center; padding: 40px 20px;
+    color: var(--text2);
+  }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.5; }
+
+  /* Modal */
+  .modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.6);
+    z-index: 200;
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    width: 100%; max-width: 500px;
+    max-height: 80vh; overflow-y: auto;
+    padding: 20px;
+  }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+
+  /* Select */
+  select.set-input {
+    -webkit-appearance: none;
+    appearance: none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>Iron Log</h1>
+  <div class="topbar-right">
+    <button class="btn-icon" onclick="showSettings()" title="Settings">
+      <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M1 10h2m14 0h2m-3.5-6.5-1.4 1.4M5.9 14.1l-1.4 1.4m0-11L5.9 5.9m8.2 8.2 1.4 1.4"/></svg>
+    </button>
+  </div>
+</div>
+
+<!-- Pages -->
+<div id="page-today" class="page active"></div>
+<div id="page-history" class="page"></div>
+<div id="page-progress" class="page"></div>
+<div id="page-plan" class="page"></div>
+
+<!-- Rest Timer -->
+<div class="rest-timer" id="restTimer">
+  <div>
+    <div class="timer-label">Rest Timer</div>
+    <div class="timer-display" id="timerDisplay">2:00</div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-sm btn-secondary" onclick="adjustTimer(-30)">-30s</button>
+    <button class="btn btn-sm btn-secondary" onclick="adjustTimer(30)">+30s</button>
+    <button class="btn btn-sm btn-primary" onclick="stopTimer()">Done</button>
+  </div>
+</div>
+
+<!-- Install Banner -->
+<div id="installBanner" style="display:none;position:fixed;bottom:70px;left:12px;right:12px;background:var(--surface);border:1px solid var(--accent);border-radius:12px;padding:12px 16px;align-items:center;justify-content:space-between;gap:12px;z-index:100;box-shadow:0 4px 20px rgba(0,0,0,0.5)">
+  <div style="flex:1">
+    <div style="font-weight:600;font-size:14px;color:var(--text)">Install Iron Log</div>
+    <div style="font-size:12px;color:var(--text-dim);margin-top:2px">Add to your home screen for the full app experience</div>
+  </div>
+  <button class="btn btn-sm btn-primary" onclick="installPWA()" style="white-space:nowrap">Install</button>
+  <button onclick="dismissInstall()" style="background:none;border:none;color:var(--text-dim);font-size:18px;padding:4px;cursor:pointer">&times;</button>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottomnav">
+  <button class="nav-item active" onclick="switchPage('today')" id="nav-today">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+    Workout
+  </button>
+  <button class="nav-item" onclick="switchPage('history')" id="nav-history">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    History
+  </button>
+  <button class="nav-item" onclick="switchPage('progress')" id="nav-progress">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 18l6-6 4 4 8-8m0 0h-6m6 0v6"/></svg>
+    Progress
+  </button>
+  <button class="nav-item" onclick="switchPage('plan')" id="nav-plan">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+    Plan
+  </button>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <div class="modal-title">Settings</div>
+    <div class="card" style="background:var(--bg)">
+      <div class="card-title" style="margin-bottom:12px">Rest Timer (seconds)</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-secondary" onclick="setRestDuration(90)" id="rest-90">90s</button>
+        <button class="btn btn-sm btn-secondary" onclick="setRestDuration(120)" id="rest-120">120s</button>
+        <button class="btn btn-sm btn-secondary" onclick="setRestDuration(150)" id="rest-150">150s</button>
+        <button class="btn btn-sm btn-secondary" onclick="setRestDuration(180)" id="rest-180">180s</button>
+      </div>
+    </div>
+    <div class="card" style="background:var(--bg);margin-top:12px">
+      <div class="card-title" style="margin-bottom:12px">Google Sheets Backup</div>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 10px 0;line-height:1.4">
+        Sync your workout data to a Google Sheet for cloud backup.
+        <a href="#" onclick="showSyncSetup();return false" style="color:var(--accent)">Setup guide</a>
+      </p>
+      <div style="margin-bottom:8px">
+        <input type="text" id="sheetsUrl" placeholder="Paste your Apps Script URL here"
+          style="width:100%;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box"
+          onchange="saveSheetsUrl()">
+      </div>
+      <button class="btn btn-sm btn-secondary btn-block" onclick="testSheetsConnection()" style="margin-bottom:8px">Test Connection</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-sm btn-secondary" onclick="syncToSheets()" style="flex:1" id="syncBtn">
+          <span id="syncBtnText">Push to Sheets</span>
+        </button>
+        <button class="btn btn-sm btn-secondary" onclick="pullFromSheets()" style="flex:1" id="pullBtn">
+          <span id="pullBtnText">Pull from Sheets</span>
+        </button>
+      </div>
+      <div id="syncStatus" style="font-size:12px;margin-top:6px;color:var(--text-dim);display:none"></div>
+    </div>
+    <div class="card" style="background:var(--bg);margin-top:12px">
+      <div class="card-title" style="margin-bottom:12px">Local Data</div>
+      <button class="btn btn-sm btn-secondary btn-block" onclick="exportData()" style="margin-bottom:8px">Export All Data (JSON)</button>
+      <button class="btn btn-sm btn-secondary btn-block" onclick="document.getElementById('importInput').click()">Import Data (JSON)</button>
+      <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="closeSettings()">Close</button>
+  </div>
+</div>
+
+<!-- Sync Setup Guide Modal -->
+<div class="modal-overlay" id="syncSetupModal">
+  <div class="modal" style="max-height:80vh;overflow-y:auto">
+    <div class="modal-title">Google Sheets Backup Setup</div>
+    <div style="font-size:13px;line-height:1.6;color:var(--text-dim)">
+      <p style="margin:0 0 12px"><strong style="color:var(--text)">One-time setup (5 min):</strong></p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">1.</strong> Open <a href="https://sheets.google.com" target="_blank" style="color:var(--accent)">Google Sheets</a> and create a new blank spreadsheet. Name it whatever you want (e.g. "Workout Backup").</p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">2.</strong> Go to <strong style="color:var(--text)">Extensions &gt; Apps Script</strong>.</p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">3.</strong> Delete everything in the editor and paste this code:</p>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:monospace;font-size:11px;white-space:pre-wrap;margin-bottom:8px;max-height:200px;overflow-y:auto;user-select:all" id="appsScriptCode">function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var data = JSON.parse(e.postData.contents);
+
+  if (data.action === 'push') {
+    // --- Readable sheet: one row per exercise ---
+    var vis = ss.getSheetByName('Workouts');
+    if (!vis) vis = ss.insertSheet('Workouts');
+    vis.clear();
+    vis.appendRow(['Date','Day','Duration (min)',
+      'Exercise','Type','Weight (lbs)',
+      'Set 1','Set 2','Set 3','Set 4','Notes']);
+    // Bold + freeze header
+    vis.getRange(1,1,1,11).setFontWeight('bold');
+    vis.setFrozenRows(1);
+    var rows = [];
+    data.workouts.forEach(function(w) {
+      w.exercises.forEach(function(ex) {
+        var r = [w.date, w.dayLabel||'', w.duration||'',
+          ex.name, ex.type||'', ex.weight||''];
+        var sets = ex.sets || [];
+        for (var i = 0; i < 4; i++)
+          r.push(sets[i] ? sets[i].reps : '');
+        r.push(ex.note || '');
+        rows.push(r);
+      });
+    });
+    if (rows.length > 0)
+      vis.getRange(2,1,rows.length,11).setValues(rows);
+
+    // --- Raw sheet: JSON for reliable restore ---
+    var raw = ss.getSheetByName('_raw');
+    if (!raw) { raw = ss.insertSheet('_raw'); }
+    raw.clear();
+    var json = JSON.stringify(data.workouts);
+    var CHUNK = 40000;
+    for (var i = 0; i < json.length; i += CHUNK)
+      raw.getRange(i/CHUNK+1,1).setValue(json.substring(i,i+CHUNK));
+    raw.getRange(1,2).setValue(new Date().toISOString());
+    raw.getRange(1,3).setValue(Math.ceil(json.length/CHUNK));
+
+    return ContentService.createTextOutput(JSON.stringify({
+      ok:true, count:data.workouts.length, time:new Date().toISOString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  if (data.action === 'pull') {
+    var raw = ss.getSheetByName('_raw');
+    if (!raw) return ContentService.createTextOutput(
+      JSON.stringify({ok:true, workouts:[], time:null})
+    ).setMimeType(ContentService.MimeType.JSON);
+    var n = parseInt(raw.getRange(1,3).getValue()) || 1;
+    var json = '';
+    for (var i = 0; i < n; i++)
+      json += (raw.getRange(i+1,1).getValue() || '');
+    var time = raw.getRange(1,2).getValue();
+    return ContentService.createTextOutput(JSON.stringify({
+      ok:true, workouts: json ? JSON.parse(json) : [], time: time||null
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
+  return ContentService.createTextOutput(
+    JSON.stringify({ok:false})
+  ).setMimeType(ContentService.MimeType.JSON);
+}
+
+function doGet(e) {
+  var cb = (e.parameter || {}).callback || '';
+  var action = (e.parameter || {}).action || 'ping';
+  var result;
+
+  if (action === 'pull') {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var raw = ss.getSheetByName('_raw');
+    if (!raw) {
+      result = {ok:true, workouts:[], time:null};
+    } else {
+      var n = parseInt(raw.getRange(1,3).getValue()) || 1;
+      var json = '';
+      for (var i = 0; i < n; i++)
+        json += (raw.getRange(i+1,1).getValue() || '');
+      var time = raw.getRange(1,2).getValue();
+      result = {ok:true, workouts: json ? JSON.parse(json) : [], time: time||null};
+    }
+  } else {
+    result = {ok:true, msg:'IronLog Sync active'};
+  }
+
+  // JSONP: wrap in callback if provided
+  if (cb) {
+    return ContentService.createTextOutput(
+      cb + '(' + JSON.stringify(result) + ')'
+    ).setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  return ContentService.createTextOutput(
+    JSON.stringify(result)
+  ).setMimeType(ContentService.MimeType.JSON);
+}</div>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">4.</strong> Click the 💾 Save icon (or Ctrl+S), then click <strong style="color:var(--text)">Deploy &gt; New deployment</strong>.</p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">5.</strong> Click the ⚙️ gear next to "Select type" and choose <strong style="color:var(--text)">Web app</strong>.</p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">6.</strong> Set <strong style="color:var(--text)">"Execute as"</strong> to <strong style="color:var(--text)">Me</strong>. Set <strong style="color:var(--text)">"Who has access"</strong> to <strong style="color:var(--text)">Anyone</strong>. Click <strong style="color:var(--text)">Deploy</strong>.</p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">7.</strong> Click <strong style="color:var(--text)">Authorize access</strong> when prompted. If you see "Google hasn't verified this app", click <strong style="color:var(--text)">Advanced &gt; Go to Untitled project (unsafe)</strong> — this is safe, it's your own script.</p>
+      <p style="margin:0 0 8px"><strong style="color:var(--accent)">8.</strong> Copy the <strong style="color:var(--text)">Web app URL</strong> (starts with https://script.google.com/...) and paste it in the field above.</p>
+      <p style="margin:12px 0 0;padding-top:10px;border-top:1px solid var(--border);color:var(--text)">
+        That's it! Your data will automatically back up each time you finish a workout. You can also use <strong>Push to Sheets</strong> manually or <strong>Pull from Sheets</strong> to restore on a new device.
+      </p>
+      <p style="margin:8px 0 0;font-size:12px;color:var(--text-dim)">
+        <strong>Tip:</strong> If you update the Apps Script code later, you must create a <strong>new deployment</strong> (Deploy &gt; New deployment) — editing the code alone doesn't update the live URL.
+      </p>
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="closeSyncSetup()">Got it</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA MODEL & WORKOUT PLAN
+// ============================================================
+
+const PROGRAM = {
+  dayA: {
+    label: 'Day A',
+    color: 'a',
+    blocks: [
+      {
+        main: { name: 'Barbell Row', sets: 3, minReps: 8, maxReps: 12, type: 'main', increment: 5 },
+        accessory: { name: 'Crunches', sets: 3, minReps: 50, maxReps: 75, type: 'accessory', category: 'Core' },
+      },
+      {
+        main: { name: 'Bench Press', sets: 3, minReps: 8, maxReps: 12, type: 'main', increment: 5 },
+        accessory: { name: 'Single Leg RDL', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Legs' },
+      },
+      {
+        main: { name: 'Squat', sets: 3, minReps: 8, maxReps: 12, type: 'main', increment: 5 },
+        accessory: { name: 'Dips', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Push', increment: 5 },
+      },
+    ]
+  },
+  dayB: {
+    label: 'Day B',
+    color: 'b',
+    blocks: [
+      {
+        main: { name: 'Lat Pulldown', sets: 3, minReps: 8, maxReps: 12, type: 'main', increment: 2.5 },
+        accessory: { name: 'Face Pulls', sets: 3, minReps: 15, maxReps: 25, type: 'accessory', category: 'Rear Delt' },
+      },
+      {
+        main: { name: 'Overhead Press', sets: 3, minReps: 8, maxReps: 12, type: 'main', increment: 2.5 },
+        accessory: { name: 'Single Leg Squat', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Legs' },
+      },
+      {
+        main: { name: 'Deadlift', sets: 3, minReps: 8, maxReps: 12, type: 'main', increment: 5 },
+        accessory: { name: 'Hammer Bicep Curls', sets: 3, minReps: 8, maxReps: 15, type: 'accessory', category: 'Pull' },
+      },
+    ]
+  }
+};
+
+// Helper: get all exercises from a day (flat list)
+function getDayExercises(day) {
+  const list = [];
+  day.blocks.forEach(b => { list.push(b.main); list.push(b.accessory); });
+  return list;
+}
+
+// Starting weights based on Kevin's current data
+const DEFAULT_WEIGHTS = {
+  'Barbell Row': 155,
+  'Bench Press': 135,
+  'Squat': 190,
+  'Lat Pulldown': 130,
+  'Overhead Press': 85,
+  'Deadlift': 165,
+  'Hammer Bicep Curls': 35,
+  'Single Leg RDL': 55,
+  'Single Leg Squat': 45,
+  'Dips': 10,
+  'Crunches': 0,
+  'Face Pulls': 30,
+};
+
+// ============================================================
+// STATE
+// ============================================================
+
+let state = {
+  workouts: [],       // completed workouts
+  currentWorkout: null, // in-progress workout
+  nextDay: 'dayA',
+  restDuration: 120,
+  timerInterval: null,
+  timerRemaining: 0,
+};
+
+function save() {
+  const s = { ...state };
+  delete s.timerInterval;
+  try { localStorage.setItem('ironlog', JSON.stringify(s)); } catch(e) {}
+}
+
+function load() {
+  try {
+    const d = localStorage.getItem('ironlog');
+    if (d) {
+      const parsed = JSON.parse(d);
+      state = { ...state, ...parsed };
+    }
+  } catch(e) {}
+}
+
+// ============================================================
+// DOUBLE PROGRESSION LOGIC
+// ============================================================
+
+function getLastWorkoutForExercise(exerciseName) {
+  for (let i = state.workouts.length - 1; i >= 0; i--) {
+    const w = state.workouts[i];
+    const ex = w.exercises.find(e => e.name === exerciseName);
+    if (ex) return ex;
+  }
+  return null;
+}
+
+function getTargetForExercise(template) {
+  const last = getLastWorkoutForExercise(template.name);
+
+  if (!last) {
+    const defaultW = DEFAULT_WEIGHTS[template.name] || 0;
+    return {
+      weight: defaultW,
+      targetReps: template.minReps,
+      note: 'Starting weight'
+    };
+  }
+
+  // Check if all sets hit maxReps
+  const allMaxed = last.sets.every(s => s.reps >= template.maxReps);
+
+  if (allMaxed && template.increment) {
+    return {
+      weight: last.weight + template.increment,
+      targetReps: template.minReps,
+      note: `+${template.increment} lbs — you hit ${template.maxReps} on all sets!`
+    };
+  }
+
+  // Check if failed badly (couldn't hit minReps on most sets)
+  const failedSets = last.sets.filter(s => s.reps < template.minReps).length;
+  if (failedSets >= 2 && template.increment) {
+    const deload = Math.round(last.weight * 0.9 / 5) * 5;
+    return {
+      weight: deload,
+      targetReps: template.minReps,
+      note: `Deload to ${deload} lbs — build back up`
+    };
+  }
+
+  // Otherwise keep same weight, try for more reps
+  const avgReps = Math.round(last.sets.reduce((s, x) => s + x.reps, 0) / last.sets.length);
+  return {
+    weight: last.weight,
+    targetReps: Math.min(avgReps + 1, template.maxReps),
+    note: `Same weight — aim for ${Math.min(avgReps + 1, template.maxReps)} reps (last avg: ${avgReps})`
+  };
+}
+
+// ============================================================
+// WORKOUT PAGE
+// ============================================================
+
+function renderToday() {
+  const page = document.getElementById('page-today');
+
+  if (state.currentWorkout) {
+    renderActiveWorkout(page);
+    return;
+  }
+
+  const day = PROGRAM[state.nextDay];
+
+  let html = `
+    <div class="workout-indicator">
+      <div class="workout-day-label day-${day.color}-text">${day.label}</div>
+      <div class="workout-date">${formatDate(new Date())}</div>
+    </div>
+  `;
+
+  day.blocks.forEach((block, bi) => {
+    const mainTarget = getTargetForExercise(block.main);
+    const accTarget = getTargetForExercise(block.accessory);
+    const lastMain = getLastWorkoutForExercise(block.main.name);
+    const lastMainNote = lastMain && lastMain.note ? lastMain.note : '';
+
+    html += `<div class="section-header">Block ${bi + 1}</div>`;
+    html += `
+      <div class="card" style="border-left:3px solid var(--accent)">
+        <div class="exercise-name">
+          ${block.main.name}
+          <span class="exercise-tag tag-main">Main</span>
+        </div>
+        <div class="exercise-target">
+          ${block.main.sets} sets × ${mainTarget.targetReps} reps @ <strong>${mainTarget.weight} lbs</strong>
+        </div>
+        <div style="font-size:12px;color:var(--text2);margin-top:4px">
+          ${mainTarget.note}
+        </div>
+        ${lastMainNote ? `<div style="font-size:12px;color:var(--yellow);margin-top:4px;font-style:italic">Last note: ${lastMainNote}</div>` : ''}
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--surface2)">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);margin-bottom:4px">⇄ Between sets</div>
+          <div class="exercise-name" style="font-size:14px">
+            ${block.accessory.name}
+            <span class="exercise-tag tag-accessory">${block.accessory.category}</span>
+          </div>
+          <div class="exercise-target" style="font-size:13px">
+            ${block.accessory.sets} sets × ${accTarget.targetReps} reps${accTarget.weight ? ` @ <strong>${accTarget.weight} lbs</strong>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+    <button class="btn btn-primary btn-block" style="margin-top:20px;padding:14px" onclick="startWorkout()">
+      Start ${day.label} Workout
+    </button>
+    <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="toggleDay()">
+      Switch to ${state.nextDay === 'dayA' ? 'Day B' : 'Day A'}
+    </button>
+  `;
+
+  page.innerHTML = html;
+}
+
+function startWorkout() {
+  const day = PROGRAM[state.nextDay];
+  const allExercises = getDayExercises(day);
+
+  // Build blocks metadata for active workout rendering
+  const blocks = day.blocks.map(b => ({
+    mainName: b.main.name,
+    accName: b.accessory.name,
+  }));
+
+  state.currentWorkout = {
+    day: state.nextDay,
+    dayLabel: day.label,
+    startTime: Date.now(),
+    blocks: blocks,
+    exercises: allExercises.map(ex => {
+      const target = getTargetForExercise(ex);
+      return {
+        name: ex.name,
+        type: ex.type,
+        category: ex.category || '',
+        template: ex,
+        weight: target.weight,
+        targetReps: target.targetReps,
+        sets: Array.from({length: ex.sets}, () => ({ reps: 0, done: false })),
+        note: ''
+      };
+    }),
+    notes: ''
+  };
+
+  save();
+  renderToday();
+}
+
+function renderActiveWorkout(page) {
+  const w = state.currentWorkout;
+  const day = PROGRAM[w.day];
+  const totalSets = w.exercises.reduce((s, e) => s + e.sets.length, 0);
+  const doneSets = w.exercises.reduce((s, e) => s + e.sets.filter(x => x.done).length, 0);
+  const elapsed = Math.floor((Date.now() - w.startTime) / 60000);
+
+  let html = `
+    <div class="workout-indicator">
+      <div class="workout-day-label day-${day.color}-text">${day.label}</div>
+      <div class="workout-date">${elapsed} min — ${doneSets}/${totalSets} sets done</div>
+    </div>
+  `;
+
+  // Render in paired blocks
+  const blocks = w.blocks || [];
+  if (blocks.length > 0) {
+    blocks.forEach((block, bi) => {
+      const mainEx = w.exercises.find(e => e.name === block.mainName);
+      const accEx = w.exercises.find(e => e.name === block.accName);
+      const mainIdx = w.exercises.indexOf(mainEx);
+      const accIdx = w.exercises.indexOf(accEx);
+
+      html += `<div class="section-header">Block ${bi + 1}</div>`;
+      if (mainEx) html += renderExerciseInput(mainEx, mainIdx);
+      if (accEx) {
+        html += `<div style="text-align:center;padding:4px 0;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim)">⇄ Do between sets of ${block.mainName}</div>`;
+        html += renderExerciseInput(accEx, accIdx);
+      }
+    });
+  } else {
+    // Fallback for old workouts without blocks
+    w.exercises.forEach((ex, exIdx) => {
+      html += renderExerciseInput(ex, exIdx);
+    });
+  }
+
+  html += `
+    <div class="card" style="margin-top:16px">
+      <div class="card-title" style="margin-bottom:8px">Workout Notes</div>
+      <textarea class="notes-input" placeholder="How did it feel?" onchange="state.currentWorkout.notes=this.value;save()">${w.notes || ''}</textarea>
+    </div>
+    <button class="btn btn-success btn-block" style="margin-top:12px;padding:14px" onclick="finishWorkout()">
+      Finish Workout
+    </button>
+    <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="cancelWorkout()">
+      Cancel Workout
+    </button>
+  `;
+
+  page.innerHTML = html;
+}
+
+function renderExerciseInput(ex, exIdx) {
+  const allDone = ex.sets.every(s => s.done);
+  let html = `
+    <div class="exercise-block card">
+      <div class="exercise-name">
+        ${allDone ? '✓ ' : ''}${ex.name}
+        <span class="exercise-tag ${ex.type === 'main' ? 'tag-main' : 'tag-accessory'}">
+          ${ex.type === 'main' ? 'Main' : ex.category}
+        </span>
+      </div>
+      <div class="exercise-target" style="margin-bottom:10px">
+        Target: ${ex.sets.length} × ${ex.targetReps} @ ${ex.weight || 'BW'} lbs
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <label style="font-size:12px;color:var(--text2)">Weight:</label>
+        <input type="number" class="set-input" style="width:80px" value="${ex.weight}"
+          onchange="updateWeight(${exIdx}, this.value)" inputmode="decimal">
+        <span style="font-size:12px;color:var(--text2)">lbs</span>
+      </div>
+      <div class="sets-grid">
+        <div class="set-header"></div>
+        <div class="set-header">Reps</div>
+        <div class="set-header"></div>
+        <div class="set-header"></div>
+  `;
+
+  ex.sets.forEach((set, si) => {
+    html += `
+      <div class="set-label">S${si + 1}</div>
+      <input type="number" class="set-input" value="${set.reps || ''}" placeholder="${ex.targetReps}"
+        inputmode="numeric" onchange="updateReps(${exIdx}, ${si}, this.value)">
+      <div></div>
+      <button class="set-check ${set.done ? 'done' : ''}" onclick="toggleSet(${exIdx}, ${si})">
+        ${set.done ? '✓' : ''}
+      </button>
+    `;
+  });
+
+  html += `</div>`;
+
+  // Note field
+  html += `
+    <input type="text" class="set-input" style="margin-top:10px;text-align:left;font-size:13px"
+      placeholder="Notes for ${ex.name}..." value="${ex.note || ''}"
+      onchange="updateExNote(${exIdx}, this.value)">
+  </div>`;
+
+  return html;
+}
+
+function updateWeight(exIdx, val) {
+  state.currentWorkout.exercises[exIdx].weight = parseFloat(val) || 0;
+  save();
+}
+
+function updateReps(exIdx, setIdx, val) {
+  state.currentWorkout.exercises[exIdx].sets[setIdx].reps = parseInt(val) || 0;
+  save();
+}
+
+function updateExNote(exIdx, val) {
+  state.currentWorkout.exercises[exIdx].note = val;
+  save();
+}
+
+function toggleSet(exIdx, setIdx) {
+  const set = state.currentWorkout.exercises[exIdx].sets[setIdx];
+  set.done = !set.done;
+  save();
+
+  if (set.done) startTimer();
+  renderToday();
+}
+
+function toggleDay() {
+  state.nextDay = state.nextDay === 'dayA' ? 'dayB' : 'dayA';
+  save();
+  renderToday();
+}
+
+function finishWorkout() {
+  const w = state.currentWorkout;
+
+  const completed = {
+    id: Date.now(),
+    date: new Date().toISOString().slice(0, 10),
+    day: w.day,
+    dayLabel: w.dayLabel,
+    duration: Math.floor((Date.now() - w.startTime) / 60000),
+    exercises: w.exercises.map(ex => ({
+      name: ex.name,
+      type: ex.type,
+      weight: ex.weight,
+      sets: ex.sets.map(s => ({ reps: s.reps })),
+      note: ex.note || ''
+    })),
+    notes: w.notes || ''
+  };
+
+  state.workouts.push(completed);
+  state.currentWorkout = null;
+  state.nextDay = w.day === 'dayA' ? 'dayB' : 'dayA';
+
+  stopTimer();
+  save();
+  renderToday();
+  renderHistory();
+
+  // Auto-backup to Google Sheets (runs in background, won't block UI)
+  autoBackup();
+}
+
+function cancelWorkout() {
+  if (confirm('Cancel this workout? Progress will be lost.')) {
+    state.currentWorkout = null;
+    stopTimer();
+    save();
+    renderToday();
+  }
+}
+
+// ============================================================
+// REST TIMER
+// ============================================================
+
+function startTimer() {
+  stopTimer();
+  state.timerRemaining = state.restDuration;
+  updateTimerDisplay();
+  document.getElementById('restTimer').classList.add('show');
+
+  state.timerInterval = setInterval(() => {
+    state.timerRemaining--;
+    updateTimerDisplay();
+    if (state.timerRemaining <= 0) {
+      stopTimer();
+      try { navigator.vibrate(500); } catch(e) {}
+    }
+  }, 1000);
+}
+
+function stopTimer() {
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerInterval = null;
+  document.getElementById('restTimer').classList.remove('show');
+}
+
+function adjustTimer(secs) {
+  state.timerRemaining = Math.max(0, state.timerRemaining + secs);
+  updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+  const m = Math.floor(state.timerRemaining / 60);
+  const s = state.timerRemaining % 60;
+  document.getElementById('timerDisplay').textContent = `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+// ============================================================
+// HISTORY PAGE
+// ============================================================
+
+function renderHistory() {
+  const page = document.getElementById('page-history');
+
+  if (state.workouts.length === 0) {
+    page.innerHTML = `
+      <div class="empty-state">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>No workouts logged yet.</div>
+        <div style="margin-top:8px;font-size:13px">Complete your first workout to see it here.</div>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `<div class="section-header">Workout History</div>`;
+
+  const sorted = [...state.workouts].reverse();
+  sorted.forEach(w => {
+    const dayClass = w.day === 'dayA' ? 'day-a' : 'day-b';
+    html += `
+      <div class="card history-item" onclick="showWorkoutDetail(${w.id})">
+        <div class="history-date">
+          <span class="day-badge ${dayClass}">${w.dayLabel}</span>
+          ${formatDate(new Date(w.date))}
+          <span style="color:var(--text2);font-size:12px;margin-left:auto">${w.duration || '?'} min</span>
+        </div>
+        <div class="history-exercises">
+    `;
+
+    w.exercises.filter(e => e.type === 'main').forEach(ex => {
+      const repsStr = ex.sets.map(s => s.reps).join('/');
+      html += `${ex.name}: ${repsStr} @ ${ex.weight} lbs<br>`;
+    });
+
+    html += `</div></div>`;
+  });
+
+  page.innerHTML = html;
+}
+
+function showWorkoutDetail(id) {
+  const w = state.workouts.find(x => x.id === id);
+  if (!w) return;
+
+  const modal = document.getElementById('settingsModal');
+  const content = modal.querySelector('.modal');
+
+  let html = `<div class="modal-title">${w.dayLabel} — ${formatDate(new Date(w.date))}</div>`;
+
+  w.exercises.forEach(ex => {
+    const repsStr = ex.sets.map(s => s.reps).join(' / ');
+    html += `
+      <div style="padding:8px 0;border-bottom:1px solid var(--surface2)">
+        <div style="font-weight:600;font-size:14px">${ex.name}</div>
+        <div style="font-size:13px;color:var(--text2)">${repsStr} @ ${ex.weight || 'BW'} lbs</div>
+        ${ex.note ? `<div style="font-size:12px;color:var(--yellow);margin-top:2px">${ex.note}</div>` : ''}
+      </div>
+    `;
+  });
+
+  if (w.notes) {
+    html += `<div style="margin-top:12px;font-size:13px;color:var(--text2)">${w.notes}</div>`;
+  }
+
+  html += `<button class="btn btn-primary btn-block" style="margin-top:16px" onclick="closeSettings()">Close</button>`;
+
+  content.innerHTML = html;
+  modal.classList.add('show');
+}
+
+// ============================================================
+// PROGRESS PAGE
+// ============================================================
+
+function renderProgress() {
+  const page = document.getElementById('page-progress');
+
+  if (state.workouts.length === 0) {
+    page.innerHTML = `
+      <div class="empty-state">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 18l6-6 4 4 8-8m0 0h-6m6 0v6"/></svg>
+        <div>No progress data yet.</div>
+        <div style="margin-top:8px;font-size:13px">Complete a few workouts to see your trends.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const mainLifts = ['Barbell Row', 'Bench Press', 'Squat', 'Lat Pulldown', 'Chin Ups', 'Overhead Press', 'Deadlift'];
+
+  let html = `<div class="section-header">Main Lift Progress</div>`;
+
+  mainLifts.forEach(liftName => {
+    const history = [];
+    state.workouts.forEach(w => {
+      const ex = w.exercises.find(e => e.name === liftName);
+      if (ex) {
+        const avgReps = Math.round(ex.sets.reduce((s, x) => s + x.reps, 0) / ex.sets.length);
+        history.push({ date: w.date, weight: ex.weight, avgReps, sets: ex.sets });
+      }
+    });
+
+    if (history.length === 0) return;
+
+    const latest = history[history.length - 1];
+    const first = history[0];
+    const weightChange = latest.weight - first.weight;
+    const badgeClass = weightChange > 0 ? 'badge-up' : weightChange < 0 ? 'badge-down' : 'badge-same';
+    const arrow = weightChange > 0 ? '↑' : weightChange < 0 ? '↓' : '→';
+
+    html += `
+      <div class="card lift-progress">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div class="lift-name">${liftName}</div>
+          <span class="progress-badge ${badgeClass}">${arrow} ${Math.abs(weightChange)} lbs</span>
+        </div>
+        <div class="lift-current">
+          Current: ${latest.weight} lbs × ~${latest.avgReps} reps
+        </div>
+        <canvas id="chart-${liftName.replace(/\s/g, '')}" height="120"></canvas>
+      </div>
+    `;
+  });
+
+  // Workout frequency
+  html += `
+    <div class="section-header">Workout Frequency</div>
+    <div class="card">
+      <div class="summary-grid">
+        <div class="summary-stat">
+          <div class="value">${state.workouts.length}</div>
+          <div class="label">Total</div>
+        </div>
+        <div class="summary-stat">
+          <div class="value">${getWorkoutsThisWeek()}</div>
+          <div class="label">This Week</div>
+        </div>
+        <div class="summary-stat">
+          <div class="value">${getWorkoutsThisMonth()}</div>
+          <div class="label">This Month</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  page.innerHTML = html;
+
+  // Draw charts
+  mainLifts.forEach(liftName => {
+    const history = [];
+    state.workouts.forEach(w => {
+      const ex = w.exercises.find(e => e.name === liftName);
+      if (ex) history.push({ date: w.date, weight: ex.weight });
+    });
+    if (history.length > 0) {
+      drawChart(`chart-${liftName.replace(/\s/g, '')}`, history);
+    }
+  });
+}
+
+function drawChart(canvasId, data) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+
+  // Filter out bad data points (weight 0 or NaN)
+  data = data.filter(d => d.weight > 0 && isFinite(d.weight));
+  if (data.length === 0) return;
+
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 160 * dpr;
+  canvas.style.height = '160px';
+  ctx.scale(dpr, dpr);
+
+  const w = rect.width;
+  const h = 160;
+  const pad = { top: 10, right: 10, bottom: 36, left: 44 };
+  const plotW = w - pad.left - pad.right;
+  const plotH = h - pad.top - pad.bottom;
+
+  const weights = data.map(d => d.weight);
+  const minW = Math.floor((Math.min(...weights) - 5) / 5) * 5;
+  const maxW = Math.ceil((Math.max(...weights) + 5) / 5) * 5;
+  const range = maxW - minW || 10;
+
+  // Y-axis grid lines (4 lines with nice round numbers)
+  const steps = 4;
+  const stepSize = Math.ceil(range / steps / 5) * 5;
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 0.5;
+  for (let val = minW; val <= maxW; val += stepSize) {
+    const y = pad.top + plotH - ((val - minW) / range) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(w - pad.right, y);
+    ctx.stroke();
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px system-ui';
+    ctx.textAlign = 'right';
+    ctx.fillText(val + '', pad.left - 6, y + 3);
+  }
+
+  // X-axis date labels (show ~4-6 dates evenly spaced)
+  const numLabels = Math.min(data.length, 5);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '9px system-ui';
+  ctx.textAlign = 'center';
+  for (let i = 0; i < numLabels; i++) {
+    const idx = Math.round(i * (data.length - 1) / Math.max(numLabels - 1, 1));
+    const x = pad.left + (idx / Math.max(data.length - 1, 1)) * plotW;
+    const d = new Date(data[idx].date);
+    const label = (d.getMonth() + 1) + '/' + d.getDate();
+    ctx.fillText(label, x, h - pad.bottom + 14);
+  }
+  // Year labels for first and last
+  if (data.length > 1) {
+    const firstDate = new Date(data[0].date);
+    const lastDate = new Date(data[data.length-1].date);
+    ctx.font = '8px system-ui';
+    ctx.fillStyle = '#475569';
+    const x0 = pad.left;
+    const xN = pad.left + plotW;
+    ctx.textAlign = 'center';
+    ctx.fillText(firstDate.getFullYear()+'', x0, h - pad.bottom + 24);
+    if (lastDate.getFullYear() !== firstDate.getFullYear() || data.length > 10) {
+      ctx.fillText(lastDate.getFullYear()+'', xN, h - pad.bottom + 24);
+    }
+  }
+
+  // Line
+  ctx.beginPath();
+  ctx.strokeStyle = '#3b82f6';
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  data.forEach((d, i) => {
+    const x = pad.left + (i / Math.max(data.length - 1, 1)) * plotW;
+    const y = pad.top + plotH - ((d.weight - minW) / range) * plotH;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Dots
+  data.forEach((d, i) => {
+    const x = pad.left + (i / Math.max(data.length - 1, 1)) * plotW;
+    const y = pad.top + plotH - ((d.weight - minW) / range) * plotH;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fillStyle = '#3b82f6';
+    ctx.fill();
+  });
+}
+
+function getWorkoutsThisWeek() {
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0,0,0,0);
+  return state.workouts.filter(w => new Date(w.date) >= weekStart).length;
+}
+
+function getWorkoutsThisMonth() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  return state.workouts.filter(w => new Date(w.date) >= monthStart).length;
+}
+
+// ============================================================
+// PLAN PAGE
+// ============================================================
+
+function renderPlan() {
+  const page = document.getElementById('page-plan');
+
+  let html = `
+    <div class="section-header">Your Program</div>
+    <div class="card">
+      <div class="card-title">Modified Beginner A/B</div>
+      <div class="card-subtitle" style="margin-top:4px">3 days/week, alternating days</div>
+      <div style="margin-top:12px;font-size:13px;color:var(--text2);line-height:1.6">
+        Double progression: start at 8 reps, work up to 12, then add weight and reset to 8.
+        Deload 10% if you can't hit 8 reps on 2+ sets.
+      </div>
+    </div>
+  `;
+
+  ['dayA', 'dayB'].forEach(dayKey => {
+    const day = PROGRAM[dayKey];
+    html += `
+      <div class="card">
+        <div class="card-title" style="color:${dayKey === 'dayA' ? 'var(--accent)' : 'var(--orange)'}">${day.label}</div>
+        <div style="margin-top:8px">
+    `;
+
+    day.blocks.forEach((block, bi) => {
+      html += `
+        <div style="padding:8px 0;${bi > 0 ? 'margin-top:6px;border-top:2px solid var(--surface2)' : ''}">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);margin-bottom:4px">Block ${bi+1}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div>
+              <span style="font-size:14px;font-weight:500">${block.main.name}</span>
+              <span class="exercise-tag tag-main" style="margin-left:6px">Main</span>
+            </div>
+            <span style="font-size:13px;color:var(--text2)">${block.main.sets} × ${block.main.minReps}–${block.main.maxReps}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-left:12px;border-left:2px solid var(--surface2)">
+            <div>
+              <span style="font-size:11px;color:var(--text-dim)">⇄ </span>
+              <span style="font-size:13px;color:var(--text2)">${block.accessory.name}</span>
+              <span class="exercise-tag tag-accessory" style="margin-left:4px">${block.accessory.category}</span>
+            </div>
+            <span style="font-size:12px;color:var(--text-dim)">${block.accessory.sets} × ${block.accessory.minReps}–${block.accessory.maxReps}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    html += `</div></div>`;
+  });
+
+  html += `
+    <div class="section-header">Progression Rules</div>
+    <div class="card" style="font-size:13px;line-height:1.8;color:var(--text2)">
+      <strong style="color:var(--text)">Main Lifts (Double Progression)</strong><br>
+      • Start each weight at 3×8<br>
+      • Each session, try to add reps<br>
+      • Once you hit 3×12, add weight:<br>
+      &nbsp;&nbsp;— Upper body: +5 lbs (Row, Bench, Lat Pulldown, OHP)<br>
+      &nbsp;&nbsp;— Lower body: +5 lbs (Squat, Deadlift)<br>
+      • If you fail 8 reps on 2+ sets, deload 10%<br><br>
+      <strong style="color:var(--text)">Accessories</strong><br>
+      • Progress when the movement feels easy<br>
+      • Focus on form and mind-muscle connection<br>
+      • Don't stress about weight — effort matters more
+    </div>
+    <div class="section-header">Schedule</div>
+    <div class="card" style="font-size:13px;line-height:1.8;color:var(--text2)">
+      <strong style="color:var(--text)">Mon / Wed / Fri</strong> (or any 3 non-consecutive days)<br>
+      Week 1: A → B → A<br>
+      Week 2: B → A → B<br><br>
+      <strong style="color:var(--text)">Cardio</strong> (2× per week, any day)<br>
+      • 1 easy session (walk, jog, bike — 20–30 min)<br>
+      • 1 hard session (HIIT, sprints — 10–15 min)
+    </div>
+  `;
+
+  page.innerHTML = html;
+}
+
+// ============================================================
+// SETTINGS
+// ============================================================
+
+function showSettings() {
+  document.getElementById('settingsModal').classList.add('show');
+  // Highlight current rest duration
+  [90,120,150,180].forEach(d => {
+    const el = document.getElementById(`rest-${d}`);
+    if (el) el.className = `btn btn-sm ${d === state.restDuration ? 'btn-primary' : 'btn-secondary'}`;
+  });
+  // Load saved Sheets URL
+  const urlInput = document.getElementById('sheetsUrl');
+  if (urlInput) urlInput.value = getSheetsUrl();
+  // Hide sync status on open
+  document.getElementById('syncStatus').style.display = 'none';
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('show');
+}
+
+function setRestDuration(secs) {
+  state.restDuration = secs;
+  save();
+  showSettings();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(state.workouts, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ironlog-export-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (Array.isArray(data)) {
+        state.workouts = [...state.workouts, ...data];
+        save();
+        renderHistory();
+        renderProgress();
+        alert(`Imported ${data.length} workouts!`);
+      }
+    } catch(err) {
+      alert('Invalid JSON file');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ============================================================
+// GOOGLE SHEETS SYNC
+// ============================================================
+
+function getSheetsUrl() {
+  return localStorage.getItem('ironlog-sheets-url') || '';
+}
+
+function saveSheetsUrl() {
+  const url = document.getElementById('sheetsUrl').value.trim();
+  localStorage.setItem('ironlog-sheets-url', url);
+}
+
+function showSyncSetup() {
+  document.getElementById('syncSetupModal').classList.add('show');
+}
+
+function closeSyncSetup() {
+  document.getElementById('syncSetupModal').classList.remove('show');
+}
+
+function setSyncStatus(msg, isError) {
+  const el = document.getElementById('syncStatus');
+  if (!el) return;
+  el.style.display = 'block';
+  el.style.color = isError ? '#ff6b6b' : 'var(--accent)';
+  el.textContent = msg;
+}
+
+// ---- CORS strategy for Google Apps Script ----
+// The app runs from file:// on Android, which blocks reading cross-origin
+// responses. Apps Script redirects POST → script.googleusercontent.com.
+//
+// PUSH: Use mode:'no-cors'. The POST is sent and the server processes it,
+//       but we get an opaque response (can't read body). That's fine for
+//       backup — we fire-and-forget.
+//
+// PULL: Use doGet via JSONP (dynamic <script> tag). This bypasses CORS
+//       entirely since script tags aren't subject to same-origin policy.
+//       The Apps Script returns a JS callback with the data.
+
+async function syncToSheets(silent) {
+  const url = getSheetsUrl();
+  if (!url) {
+    if (!silent) setSyncStatus('Please enter your Apps Script URL first.', true);
+    return;
+  }
+  const btn = document.getElementById('syncBtnText');
+  if (btn) btn.textContent = 'Pushing...';
+  if (!silent) setSyncStatus('Syncing to Google Sheets...', false);
+  try {
+    await fetch(url, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify({ action: 'push', workouts: state.workouts }),
+    });
+    // With no-cors we get an opaque response (status 0), but the data
+    // WAS sent and processed by the server. This is expected behavior.
+    const now = new Date().toISOString();
+    localStorage.setItem('ironlog-last-sync', now);
+    if (!silent) setSyncStatus(`Backup sent at ${new Date().toLocaleString()}`, false);
+  } catch (err) {
+    if (!silent) setSyncStatus('Backup failed: ' + err.message, true);
+    console.error('Sheets sync error:', err);
+  }
+  if (btn) btn.textContent = 'Push to Sheets';
+}
+
+// JSONP helper: loads a <script> tag pointing at doGet, which calls
+// a global callback with the JSON data. Works from any origin.
+function jsonpFetch(url, params) {
+  return new Promise((resolve, reject) => {
+    const cbName = '_ironlog_cb_' + Date.now();
+    const timeout = setTimeout(() => {
+      delete window[cbName];
+      script.remove();
+      reject(new Error('Request timed out. Check your URL and internet.'));
+    }, 15000);
+
+    window[cbName] = function(data) {
+      clearTimeout(timeout);
+      delete window[cbName];
+      script.remove();
+      resolve(data);
+    };
+
+    const qs = new URLSearchParams({ ...params, callback: cbName }).toString();
+    const script = document.createElement('script');
+    script.src = url + '?' + qs;
+    script.onerror = () => {
+      clearTimeout(timeout);
+      delete window[cbName];
+      script.remove();
+      reject(new Error('Failed to connect. Check your URL.'));
+    };
+    document.head.appendChild(script);
+  });
+}
+
+async function pullFromSheets() {
+  const url = getSheetsUrl();
+  if (!url) {
+    setSyncStatus('Please enter your Apps Script URL first.', true);
+    return;
+  }
+  const btn = document.getElementById('pullBtnText');
+  btn.textContent = 'Pulling...';
+  setSyncStatus('Fetching from Google Sheets...', false);
+  try {
+    const result = await jsonpFetch(url, { action: 'pull' });
+    if (result.ok && result.workouts && result.workouts.length > 0) {
+      const localCount = state.workouts.length;
+      const remoteCount = result.workouts.length;
+      if (remoteCount >= localCount) {
+        if (confirm(`Replace local data (${localCount} workouts) with cloud backup (${remoteCount} workouts)?`)) {
+          state.workouts = result.workouts;
+          save();
+          renderHistory();
+          renderProgress();
+          const time = result.time ? new Date(result.time).toLocaleString() : 'unknown';
+          setSyncStatus(`Restored ${remoteCount} workouts (backed up ${time})`, false);
+        } else {
+          setSyncStatus('Pull cancelled.', false);
+        }
+      } else {
+        if (confirm(`Cloud has fewer workouts (${remoteCount}) than local (${localCount}). Replace local data anyway?`)) {
+          state.workouts = result.workouts;
+          save();
+          renderHistory();
+          renderProgress();
+          setSyncStatus(`Restored ${remoteCount} workouts from cloud.`, false);
+        } else {
+          setSyncStatus('Pull cancelled.', false);
+        }
+      }
+    } else if (result.ok) {
+      setSyncStatus('No backup found in Google Sheets yet.', true);
+    } else {
+      setSyncStatus('Pull failed. Check your URL and try again.', true);
+    }
+  } catch (err) {
+    setSyncStatus('Pull failed: ' + err.message, true);
+    console.error('Sheets pull error:', err);
+  }
+  btn.textContent = 'Pull from Sheets';
+}
+
+async function testSheetsConnection() {
+  const url = getSheetsUrl();
+  if (!url) {
+    setSyncStatus('Please enter your Apps Script URL first.', true);
+    return;
+  }
+  setSyncStatus('Testing connection...', false);
+  try {
+    const result = await jsonpFetch(url, { action: 'ping' });
+    if (result.ok) {
+      setSyncStatus('Connected! Your backup is set up correctly.', false);
+    } else {
+      setSyncStatus('Got a response but something is wrong. Redeploy your script.', true);
+    }
+  } catch (err) {
+    setSyncStatus('Connection failed: ' + err.message, true);
+  }
+}
+
+// Auto-backup: called silently after finishing a workout
+async function autoBackup() {
+  const url = getSheetsUrl();
+  if (!url) return;
+  try {
+    await syncToSheets(true);
+  } catch (e) {
+    console.error('Auto-backup failed:', e);
+  }
+}
+
+// ============================================================
+// NAVIGATION & UTILITIES
+// ============================================================
+
+function switchPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  document.getElementById(`nav-${name}`).classList.add('active');
+
+  if (name === 'today') renderToday();
+  if (name === 'history') renderHistory();
+  if (name === 'progress') renderProgress();
+  if (name === 'plan') renderPlan();
+}
+
+function formatDate(d) {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+// ============================================================
+// IMPORT HISTORICAL DATA
+// ============================================================
+
+function importHistoricalData() {
+  // This converts the spreadsheet data that was pre-processed
+  const HISTORY_DATA = HISTORICAL_WORKOUTS;
+  if (!HISTORY_DATA || HISTORY_DATA.length === 0) return;
+
+  // Group by date
+  const byDate = {};
+  HISTORY_DATA.forEach(entry => {
+    if (!byDate[entry.date]) byDate[entry.date] = [];
+    byDate[entry.date].push(entry);
+  });
+
+  // Helper: parse weight strings like "125/130/130" or "125130130" or "808080" or "125,130,130"
+  function parseWeight(wStr) {
+    wStr = String(wStr || '0').trim();
+    // Handle slash-separated: "135/135/135"
+    if (wStr.includes('/')) {
+      const parts = wStr.split('/').map(p => parseFloat(p)).filter(n => !isNaN(n) && n > 0);
+      return parts.length > 0 ? parts[parts.length - 1] : 0;
+    }
+    // Handle comma-separated: "125,130,130"
+    if (wStr.includes(',')) {
+      const parts = wStr.split(',').map(p => parseFloat(p)).filter(n => !isNaN(n) && n > 0);
+      return parts.length > 0 ? parts[parts.length - 1] : 0;
+    }
+    // Handle concatenated digits: "125130130" or "808080" or "353535"
+    if (/^\d{4,}$/.test(wStr)) {
+      // Try 3-digit chunks first (weights 100+)
+      if (wStr.length % 3 === 0) {
+        const chunks3 = [];
+        for (let i = 0; i < wStr.length; i += 3) chunks3.push(parseInt(wStr.substring(i, i + 3)));
+        if (chunks3.length >= 2 && chunks3.every(c => c >= 20 && c <= 500)) {
+          return chunks3[chunks3.length - 1];
+        }
+      }
+      // Try 2-digit chunks (weights < 100, like "808080" = 80/80/80)
+      if (wStr.length % 2 === 0) {
+        const chunks2 = [];
+        for (let i = 0; i < wStr.length; i += 2) chunks2.push(parseInt(wStr.substring(i, i + 2)));
+        if (chunks2.length >= 2 && chunks2.every(c => c >= 5 && c <= 99)) {
+          return chunks2[chunks2.length - 1];
+        }
+      }
+    }
+    // Simple number
+    const m = wStr.match(/(\d+\.?\d*)/);
+    return m ? parseFloat(m[1]) : 0;
+  }
+
+  // Convert to app format
+  Object.entries(byDate).forEach(([date, entries]) => {
+    // Determine day type
+    const hasRow = entries.some(e => e.exercise.includes('Row') && !e.exercise.includes('Low'));
+    const hasBench = entries.some(e => e.exercise.includes('Bench'));
+    const hasChinOrLat = entries.some(e => e.exercise.includes('Chin') || e.exercise.includes('Lat') || e.exercise.includes('Pull up'));
+
+    let day, dayLabel;
+    if (hasRow && hasBench) { day = 'dayA'; dayLabel = 'Day A'; }
+    else if (hasChinOrLat) { day = 'dayB'; dayLabel = 'Day B'; }
+    else { day = 'misc'; dayLabel = 'Misc'; }
+
+    // Determine exercise type from name
+    const accessoryNames = ['Dips', 'Crunches', 'Single Leg RDL', 'Single Leg Squat',
+      'Hammer Bicep Curls', 'Russian Twist/Crunches', 'Face Pulls', 'Calf Raises',
+      'Back Raises', 'Lateral Raises', 'Bicep Curls'];
+
+    const exercises = entries.map(e => {
+      // Parse reps - could be "10,10,10" or "10" or "10,10,8"
+      let repsList;
+      const repsStr = String(e.reps);
+      if (repsStr.includes(',')) {
+        repsList = repsStr.split(',').map(r => parseInt(r) || 0);
+      } else {
+        const r = parseInt(repsStr) || 0;
+        const numSets = parseInt(e.sets) || 3;
+        repsList = Array(numSets).fill(r);
+      }
+
+      // Parse weight with proper handling of multi-set notation
+      const weight = parseWeight(e.weight);
+
+      const isAccessory = accessoryNames.some(a => e.exercise.toLowerCase().includes(a.toLowerCase()));
+
+      return {
+        name: e.exercise,
+        type: isAccessory ? 'accessory' : 'main',
+        weight: weight,
+        sets: repsList.map(r => ({ reps: r })),
+        note: e.notes || ''
+      };
+    });
+
+    state.workouts.push({
+      id: new Date(date).getTime() + Math.random() * 1000,
+      date: date,
+      day: day,
+      dayLabel: dayLabel,
+      duration: 0,
+      exercises: exercises,
+      notes: '',
+      imported: true
+    });
+  });
+
+  // Sort by date
+  state.workouts.sort((a, b) => a.date.localeCompare(b.date));
+  save();
+}
+
+// ============================================================
+// INIT
+// ============================================================
+
+// Historical data placeholder - will be populated from spreadsheet
+const HISTORICAL_WORKOUTS = [{"date": "2025-01-02", "exercise": "Barbell Row", "reps": "5,5,7", "weight": "140", "sets": "3", "notes": "Ok. feel like dumbbell was better"}, {"date": "2025-01-02", "exercise": "Bench Press", "reps": "5,5,6", "weight": "140", "sets": "3", "notes": "Hard but doable"}, {"date": "2025-01-02", "exercise": "Deadlift", "reps": "5,5,10", "weight": "145155155", "sets": "3", "notes": "Can definitely do more, just cautious"}, {"date": "2025-01-04", "exercise": "Chin Ups", "reps": "5,5,12", "weight": "40", "sets": "3", "notes": "Can do more for regular work"}, {"date": "2025-01-04", "exercise": "Overhead Press", "reps": "5,5,10", "weight": "80", "sets": "3", "notes": "Good"}, {"date": "2025-01-04", "exercise": "Squat", "reps": "5,5,7", "weight": "135/145/155", "sets": "3", "notes": "Could do more, just nervous about my back. felt kind of tight in same area"}, {"date": "2025-01-04", "exercise": "Dips", "reps": "25", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-01-04", "exercise": "Hammer Bicep Curls", "reps": "20", "weight": "25", "sets": "3", "notes": "Pull"}, {"date": "2025-01-04", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-01-08", "exercise": "Barbell Row", "reps": "5,5,7", "weight": "145", "sets": "3", "notes": "Ok. good on weight but last rep not good"}, {"date": "2025-01-08", "exercise": "Bench Press", "reps": "5,5,5", "weight": "145", "sets": "3", "notes": "Fine. feel like I pushed myself more on the 10 rep sets"}, {"date": "2025-01-08", "exercise": "Deadlift", "reps": "5,5,5", "weight": "155155165", "sets": "3", "notes": ""}, {"date": "2025-01-09", "exercise": "Chin Ups", "reps": "5,5,8", "weight": "28", "sets": "3", "notes": "Can do more for regular work"}, {"date": "2025-01-09", "exercise": "Overhead Press", "reps": "5,5,8", "weight": "80,80,80", "sets": "3", "notes": "Good"}, {"date": "2025-01-09", "exercise": "Squat", "reps": "5,5,10", "weight": "145/155/160", "sets": "3", "notes": "Could do more, just nervous about my back. felt kind of tight in same area"}, {"date": "2025-01-11", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "4", "notes": ""}, {"date": "2025-01-11", "exercise": "Dips", "reps": "25", "weight": "", "sets": "4", "notes": ""}, {"date": "2025-01-08", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125", "sets": "3", "notes": "Tough to 10, don't move yet"}, {"date": "2025-01-08", "exercise": "Bench Press", "reps": "10,10,10", "weight": "125", "sets": "3", "notes": "Tough, could try more"}, {"date": "2025-01-08", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145150150", "sets": "3", "notes": "Tough, felt ok"}, {"date": "2025-01-08", "exercise": "Dips", "reps": "25", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-01-08", "exercise": "Hammer Bicep Curls", "reps": "25", "weight": "20,22.5,22.5", "sets": "3", "notes": "Pull"}, {"date": "2025-01-08", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-01-24", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "52,52,52", "sets": "3", "notes": "Trying out leading more with chest than head"}, {"date": "2025-01-24", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": "Good, tough"}, {"date": "2025-01-24", "exercise": "Squat", "reps": "10,10,10", "weight": "135/145/150", "sets": "3", "notes": "Could do more, just nervous about my back. felt kind of tight in same area"}, {"date": "2025-01-25", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125", "sets": "3", "notes": "tough but good, could add"}, {"date": "2025-01-25", "exercise": "Bench Press", "reps": "10,9,8", "weight": "130130125", "sets": "3", "notes": "Couldn't finish 130, or 125. Tough"}, {"date": "2025-01-25", "exercise": "Deadlift", "reps": "7", "weight": "150", "sets": "3", "notes": "Back tight, decided to stop"}, {"date": "2025-01-25", "exercise": "Dips", "reps": "25", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-01-25", "exercise": "Hammer Bicep Curls", "reps": "25", "weight": "22.5,22.5,22.5", "sets": "3", "notes": "Pull"}, {"date": "2025-01-25", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-01-26", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "46,46,46", "sets": "3", "notes": "Trying out leading more with chest than head, good level"}, {"date": "2025-01-26", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": "Good, tough for last set"}, {"date": "2025-01-26", "exercise": "Squat", "reps": "10,10,15", "weight": "135/145/150", "sets": "3", "notes": "Can do more, back felt good"}, {"date": "2025-01-27", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "130125120", "sets": "3", "notes": "Had to step back on weight"}, {"date": "2025-01-27", "exercise": "Bench Press", "reps": "10,10,10", "weight": "125125125", "sets": "3", "notes": ""}, {"date": "2025-01-30", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "46,46,46", "sets": "3", "notes": "Tough but good"}, {"date": "2025-01-30", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": ""}, {"date": "2025-01-30", "exercise": "Squat", "reps": "10,10,15", "weight": "140/150/155", "sets": "3", "notes": "Good!"}, {"date": "2025-02-02", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125125125", "sets": "3", "notes": "Had to step back on weight"}, {"date": "2025-02-02", "exercise": "Bench Press", "reps": "10,10,11", "weight": "125125125", "sets": "3", "notes": ""}, {"date": "2025-02-02", "exercise": "Deadlift", "reps": "5,5,5", "weight": "135145150", "sets": "3", "notes": "Easing back in"}, {"date": "2025-02-02", "exercise": "Dips", "reps": "25", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-02-02", "exercise": "Hammer Bicep Curls", "reps": "20,25,25", "weight": "22.5,20,20", "sets": "3", "notes": "Pull"}, {"date": "2025-02-02", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-02-09", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "46,46,46", "sets": "3", "notes": "Tough but good, can move up"}, {"date": "2025-02-09", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": ""}, {"date": "2025-02-09", "exercise": "Squat", "reps": "10,10,10", "weight": "145/155/160", "sets": "3", "notes": "Good!"}, {"date": "2025-02-09", "exercise": "Dips", "reps": "25", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-02-09", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "20,20,20", "sets": "3", "notes": "Pull"}, {"date": "2025-02-09", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-02-12", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125125125", "sets": "3", "notes": "Good, tough"}, {"date": "2025-02-12", "exercise": "Bench Press", "reps": "10,10,10", "weight": "125130130", "sets": "3", "notes": "Good. tough"}, {"date": "2025-02-12", "exercise": "Deadlift", "reps": "10,10,10", "weight": "135135135", "sets": "3", "notes": "Easing back in - lower weight higher reps"}, {"date": "2025-02-15", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "40,40,40", "sets": "3", "notes": "Good"}, {"date": "2025-02-15", "exercise": "Overhead Press", "reps": "10,10,8", "weight": "70,70,80", "sets": "3", "notes": "Can do 80 more"}, {"date": "2025-02-15", "exercise": "Squat", "reps": "10,10,10", "weight": "150/160/165", "sets": "3", "notes": "Good!"}, {"date": "2025-02-15", "exercise": "Dips", "reps": "25", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-02-15", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "20,20,20", "sets": "3", "notes": "Pull"}, {"date": "2025-02-15", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-02-16", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125130130", "sets": "3", "notes": "Tough"}, {"date": "2025-02-16", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125130130", "sets": "3", "notes": "Tough obviously"}, {"date": "2025-02-16", "exercise": "Deadlift", "reps": "10,10,10", "weight": "135135145", "sets": "3", "notes": "Easing in"}, {"date": "2025-02-16", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-02-24", "exercise": "Chin Ups", "reps": "10,8,10", "weight": "40,40,46", "sets": "3", "notes": "Tougher, had to do after dips/curls"}, {"date": "2025-02-24", "exercise": "Overhead Press", "reps": "10,9,8", "weight": "70,80,80", "sets": "3", "notes": "Tough"}, {"date": "2025-02-24", "exercise": "Squat", "reps": "10,10,13", "weight": "155/165/170", "sets": "3", "notes": "Good, can do more"}, {"date": "2025-02-24", "exercise": "Dips", "reps": "30", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-02-24", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "22.5,22.5,22.5", "sets": "3", "notes": "Pull"}, {"date": "2025-02-24", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-02-27", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125130130", "sets": "3", "notes": "Tough"}, {"date": "2025-02-27", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125130130", "sets": "3", "notes": "Tough obviously"}, {"date": "2025-02-27", "exercise": "Deadlift", "reps": "10,10,10", "weight": "135140145", "sets": "3", "notes": "Easing in, felt ok, need to keep head down"}, {"date": "2025-02-27", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-03-01", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "40,40,40", "sets": "3", "notes": "Tough"}, {"date": "2025-03-01", "exercise": "Overhead Press", "reps": "10,10,7", "weight": "80,80,80", "sets": "3", "notes": "Good, trying to keep arms at 45 deg angle"}, {"date": "2025-03-01", "exercise": "Squat", "reps": "10,10,12", "weight": "160/170/175", "sets": "3", "notes": "Good, can do more"}, {"date": "2025-03-01", "exercise": "Dips", "reps": "30", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-03-01", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "22.5,20,20", "sets": "3", "notes": "Pull"}, {"date": "2025-03-01", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-03-03", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125130130", "sets": "3", "notes": "Feeling better, should try more"}, {"date": "2025-03-03", "exercise": "Bench Press", "reps": "10,10,10", "weight": "125130130", "sets": "3", "notes": "Improving!"}, {"date": "2025-03-03", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140140145", "sets": "3", "notes": "Feel good, nice workout"}, {"date": "2025-03-03", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-03-07", "exercise": "Chin Ups", "reps": "10,10,11", "weight": "46,40,40", "sets": "3", "notes": "Fine. not sure why press was so much harder. move up"}, {"date": "2025-03-07", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "80,70,70", "sets": "3", "notes": "Harder today, dropping down to focus on form. really struggling"}, {"date": "2025-03-07", "exercise": "Squat", "reps": "10,10,10", "weight": "165/175/180", "sets": "3", "notes": "Good, can do more"}, {"date": "2025-03-07", "exercise": "Dips", "reps": "30", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-03-07", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "20,20,20", "sets": "3", "notes": "Pull"}, {"date": "2025-03-07", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-03-13", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "130130135", "sets": "3", "notes": "Feeling good"}, {"date": "2025-03-13", "exercise": "Bench Press", "reps": "8,8,7", "weight": "140135135", "sets": "3", "notes": "Accidentally did too much weight"}, {"date": "2025-03-13", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140140145", "sets": "3", "notes": ""}, {"date": "2025-03-15", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "40,40,40", "sets": "3", "notes": "Fine. not sure why press was so much harder. move up"}, {"date": "2025-03-15", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": "Good, can stay here for a bit to focus on arching back less"}, {"date": "2025-03-15", "exercise": "Squat", "reps": "10,10,10", "weight": "165/170/175", "sets": "3", "notes": "Good, taking weight back a bit to go deeper on squat"}, {"date": "2025-03-15", "exercise": "Dips", "reps": "30", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-03-15", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "20,20,20", "sets": "3", "notes": "Pull (bicep curls, turns out I was doing hammer curls before). had to break up sets in 2"}, {"date": "2025-03-15", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-03-26", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125130130", "sets": "3", "notes": "Took it down a level, felt ok though"}, {"date": "2025-03-26", "exercise": "Bench Press", "reps": "10,8,8", "weight": "125130125", "sets": "3", "notes": "Struggling"}, {"date": "2025-03-26", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140140145", "sets": "3", "notes": "Good workout"}, {"date": "2025-03-30", "exercise": "Chin Ups", "reps": "10,10,7", "weight": "40,40,40", "sets": "3", "notes": "Tough!"}, {"date": "2025-03-30", "exercise": "Overhead Press", "reps": "10,10,8", "weight": "70,70,70", "sets": "3", "notes": "Good, can stay here for a bit to focus on arching back less"}, {"date": "2025-03-30", "exercise": "Squat", "reps": "10,10,10", "weight": "165/170/175", "sets": "3", "notes": "Good, taking weight back a bit to go deeper on squat"}, {"date": "2025-03-30", "exercise": "Dips", "reps": "30", "weight": "", "sets": "3", "notes": "Push"}, {"date": "2025-03-30", "exercise": "Hammer Bicep Curls", "reps": "25,25,25", "weight": "20,20,20", "sets": "3", "notes": "Pull (bicep curls, turns out I was doing hammer curls before). had to break up sets in 2"}, {"date": "2025-03-30", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-04-03", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125125125", "sets": "3", "notes": "Felt OK"}, {"date": "2025-04-03", "exercise": "Bench Press", "reps": "10,7,9", "weight": "125125115", "sets": "3", "notes": "Not sure why I'm sucking here"}, {"date": "2025-04-03", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140140140", "sets": "3", "notes": "Took 5 off last set to be cautious"}, {"date": "2025-04-06", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": "Tough!"}, {"date": "2025-04-06", "exercise": "Overhead Press", "reps": "10,10,6,4", "weight": "70,70,70", "sets": "3", "notes": "Tbh think I need to go back down for form. had to break up last set"}, {"date": "2025-04-06", "exercise": "Squat", "reps": "10,10,10", "weight": "165/165/165", "sets": "3", "notes": "Good, taking weight back a bit to go deeper on squat"}, {"date": "2025-04-06", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-04-17", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "120125125", "sets": "3", "notes": "Good"}, {"date": "2025-04-17", "exercise": "Bench Press", "reps": "10,10,10", "weight": "120120120", "sets": "3", "notes": "Reduced weight, went slower and deeper, felt good"}, {"date": "2025-04-17", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140140140", "sets": "3", "notes": "Tough but good"}, {"date": "2025-04-19", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": "Tough!"}, {"date": "2025-04-19", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "60,60,60", "sets": "3", "notes": ""}, {"date": "2025-04-19", "exercise": "Squat", "reps": "10,10,15", "weight": "160/160/160", "sets": "3", "notes": "Good, taking weight back a bit to go deeper on squat, smith machine"}, {"date": "2025-04-19", "exercise": "Crunches", "reps": "50", "weight": "", "sets": "3", "notes": "Core"}, {"date": "2025-04-19", "exercise": "Dips", "reps": "30,30", "weight": "", "sets": "2", "notes": "Push"}, {"date": "2025-04-22", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125125125", "sets": "3", "notes": "Good"}, {"date": "2025-04-22", "exercise": "Bench Press", "reps": "10,10,10", "weight": "120120120", "sets": "3", "notes": "Reduced weight, went slower and deeper, felt good. might have done 4 sets?"}, {"date": "2025-04-22", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145145145", "sets": "3", "notes": "Tough but good"}, {"date": "2025-04-24", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": "Tough!"}, {"date": "2025-04-24", "exercise": "Overhead Press", "reps": "10,10,12", "weight": "60,60,60", "sets": "3", "notes": "Tough but good"}, {"date": "2025-04-24", "exercise": "Squat", "reps": "10,10,15", "weight": "165/165/165", "sets": "3", "notes": "Good, taking weight back a bit to go deeper on squat, smith machine"}, {"date": "2025-05-01", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "125125125", "sets": "3", "notes": "Good"}, {"date": "2025-05-01", "exercise": "Bench Press", "reps": "10,10,12", "weight": "125125125", "sets": "3", "notes": "went up, stay here for a while"}, {"date": "2025-05-01", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145145145", "sets": "3", "notes": "Tough but good"}, {"date": "2025-05-05", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": "Tough!"}, {"date": "2025-05-05", "exercise": "Overhead Press", "reps": "10,10,12", "weight": "60,60,60", "sets": "3", "notes": "Tough but good"}, {"date": "2025-05-05", "exercise": "Squat", "reps": "10,10,10", "weight": "170/170/170", "sets": "3", "notes": "could do more"}, {"date": "2025-05-07", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "125130130", "sets": "3", "notes": "130 not good, go back"}, {"date": "2025-05-07", "exercise": "Bench Press", "reps": "10,10,12", "weight": "125125125", "sets": "3", "notes": "went up, stay here for a while"}, {"date": "2025-05-07", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145145150", "sets": "3", "notes": "Tough but good"}, {"date": "2025-05-15", "exercise": "Chin Ups", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": "Tough!"}, {"date": "2025-05-15", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "60,60,60", "sets": "3", "notes": "Tough but good, good form"}, {"date": "2025-05-15", "exercise": "Squat", "reps": "10,10,10", "weight": "170/160/155", "sets": "3", "notes": "Pulling back for form, 155 is good"}, {"date": "2025-05-23", "exercise": "Barbell Row", "reps": "10,10,6+4", "weight": "125125125", "sets": "3", "notes": "Good weight, had to take one min break last set"}, {"date": "2025-05-23", "exercise": "Bench Press", "reps": "10,10,12", "weight": "125125125", "sets": "3", "notes": "went up, stay here for a while"}, {"date": "2025-05-23", "exercise": "Squat", "reps": "10,10,15", "weight": "155/155/155", "sets": "3", "notes": "Well, I can do more. form good"}, {"date": "2025-06-05", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "120120120", "sets": "3", "notes": "Good weight"}, {"date": "2025-06-05", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125125125", "sets": "3", "notes": "Down for some reason"}, {"date": "2025-06-05", "exercise": "Squat", "reps": "10,10,10", "weight": "160/160/160", "sets": "3", "notes": ""}, {"date": "2025-06-11", "exercise": "Chin Ups", "reps": "3,10,10,10", "weight": "0,45,45,45", "sets": "3", "notes": "did 3 unaided"}, {"date": "2025-06-11", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "60,60,60", "sets": "3", "notes": ""}, {"date": "2025-06-11", "exercise": "Deadlift", "reps": "10,10,10", "weight": "115115125", "sets": "3", "notes": "Way down to focus on bringing shoulders back"}, {"date": "2025-06-18", "exercise": "Barbell Row", "reps": "10,10,6+4", "weight": "125125125", "sets": "3", "notes": "Good weight, had to take one min break last set"}, {"date": "2025-06-18", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "60,60,60", "sets": "3", "notes": ""}, {"date": "2025-06-18", "exercise": "Squat", "reps": "10,10,15", "weight": "155/155/155", "sets": "3", "notes": "Can do more, form good"}, {"date": "2025-06-20", "exercise": "Deadlift", "reps": "10,10,10", "weight": "125125130", "sets": "3", "notes": "Way down to focus on bringing shoulders back"}, {"date": "2025-06-20", "exercise": "Calf Raises", "reps": "25,25,30,30", "weight": "20", "sets": "", "notes": ""}, {"date": "2025-06-20", "exercise": "Crunches", "reps": "70,70,70", "weight": "", "sets": "", "notes": ""}, {"date": "2025-06-20", "exercise": "Dips", "reps": "25,25,25", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-09", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "120120120", "sets": "3", "notes": "Can do 125"}, {"date": "2025-07-09", "exercise": "Squat", "reps": "10,10,10", "weight": "160/160/160", "sets": "3", "notes": ""}, {"date": "2025-07-09", "exercise": "Crunches", "reps": "70", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-25", "exercise": "Overhead Press", "reps": "7,10,10", "weight": "50,50,50", "sets": "3", "notes": ""}, {"date": "2025-07-25", "exercise": "Dips", "reps": "25,25,25", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-25", "exercise": "Crunches", "reps": "75,50,50", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-25", "exercise": "Bench Press", "reps": "10,10,5+5", "weight": "125125125", "sets": "3", "notes": "Hard"}, {"date": "2025-07-31", "exercise": "Dips", "reps": "25,25,25", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-31", "exercise": "Squat", "reps": "10,10,10", "weight": "160/165/165", "sets": "3", "notes": ""}, {"date": "2025-07-31", "exercise": "Calf Raises", "reps": "30,30", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-31", "exercise": "Bench Press", "reps": "10,9,6", "weight": "125125125", "sets": "3", "notes": "Hard"}, {"date": "2025-07-31", "exercise": "Crunches", "reps": "75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-07-31", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "125125125", "sets": "3", "notes": "Can do 125"}, {"date": "2025-08-02", "exercise": "Chin Ups", "reps": "5,10,10,10", "weight": "0,45,45,45", "sets": "3", "notes": "did 5 unaided, pretty good"}, {"date": "2025-08-02", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "30,35,40", "sets": "", "notes": "Hard! liked this"}, {"date": "2025-08-02", "exercise": "Overhead Press", "reps": "10,15,12", "weight": "50,60,60", "sets": "3", "notes": "Can do way more I guess"}, {"date": "2025-08-02", "exercise": "Hammer Bicep Curls", "reps": "10,10,10", "weight": "25", "sets": "", "notes": ""}, {"date": "2025-08-02", "exercise": "Deadlift", "reps": "10,10,12", "weight": "115125130", "sets": "3", "notes": "good form, much easier"}, {"date": "2025-08-02", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-04", "exercise": "Squat", "reps": "10,10,10", "weight": "165/170/170", "sets": "3", "notes": ""}, {"date": "2025-08-04", "exercise": "Calf Raises", "reps": "40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-04", "exercise": "Bench Press", "reps": "10,9,7", "weight": "125125125", "sets": "3", "notes": "Hard"}, {"date": "2025-08-04", "exercise": "Crunches", "reps": "75,50", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-04", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "130130130", "sets": "3", "notes": "Can do 125"}, {"date": "2025-08-04", "exercise": "Dips", "reps": "25,25", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-06", "exercise": "Chin Ups", "reps": "0", "weight": "0", "sets": "3", "notes": "Lats sore, holding off"}, {"date": "2025-08-06", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": "So hard! liked this"}, {"date": "2025-08-06", "exercise": "Dips", "reps": "35,35,35", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-06", "exercise": "Overhead Press", "reps": "10,10,12", "weight": "60,60,60", "sets": "3", "notes": "good, try more"}, {"date": "2025-08-06", "exercise": "Hammer Bicep Curls", "reps": "10,10,10", "weight": "25", "sets": "", "notes": ""}, {"date": "2025-08-06", "exercise": "Deadlift", "reps": "10,10,10", "weight": "130130130", "sets": "3", "notes": "good form, much easier"}, {"date": "2025-08-06", "exercise": "Crunches", "reps": "75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-09", "exercise": "Squat", "reps": "10,10,10", "weight": "165/165/165", "sets": "3", "notes": ""}, {"date": "2025-08-09", "exercise": "Bench Press", "reps": "10,10,7", "weight": "125125125", "sets": "3", "notes": "Hard"}, {"date": "2025-08-09", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "130130130", "sets": "3", "notes": "Tough"}, {"date": "2025-08-09", "exercise": "Single Leg RDL", "reps": "10", "weight": "30 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-08-11", "exercise": "Chin Ups", "reps": "0", "weight": "0", "sets": "3", "notes": "Lats sore, holding off"}, {"date": "2025-08-11", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,25,30", "sets": "", "notes": "40 too high, 30 ok"}, {"date": "2025-08-11", "exercise": "Dips", "reps": "35,30,35", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-11", "exercise": "Overhead Press", "reps": "10,10,12", "weight": "60,70,70", "sets": "3", "notes": "Stay at 70"}, {"date": "2025-08-11", "exercise": "Hammer Bicep Curls", "reps": "10,10,13", "weight": "25", "sets": "", "notes": "Try 30"}, {"date": "2025-08-11", "exercise": "Deadlift", "reps": "10,10,12", "weight": "135/135/135", "sets": "3", "notes": "good form, much easier"}, {"date": "2025-08-11", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-15", "exercise": "Squat", "reps": "10,10,10", "weight": "165/165/165", "sets": "3", "notes": ""}, {"date": "2025-08-15", "exercise": "Calf Raises", "reps": "40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-15", "exercise": "Bench Press", "reps": "10,10,9", "weight": "125125125", "sets": "3", "notes": "Hard"}, {"date": "2025-08-15", "exercise": "Single Leg RDL", "reps": "10,10", "weight": "30 lb KB one hand", "sets": "2", "notes": ""}, {"date": "2025-08-15", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "130130130", "sets": "3", "notes": "Go up"}, {"date": "2025-08-15", "exercise": "Crunches", "reps": "75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-08-16", "exercise": "Chin Ups", "reps": "0", "weight": "0", "sets": "3", "notes": "Lats sore, holding off"}, {"date": "2025-08-16", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "30,30,30", "sets": "", "notes": "move up weight"}, {"date": "2025-08-16", "exercise": "Dips", "reps": "35,35,35", "weight": "", "sets": "", "notes": "Dips way hard"}, {"date": "2025-08-16", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": "70 good"}, {"date": "2025-08-16", "exercise": "Hammer Bicep Curls", "reps": "10,10,13", "weight": "25", "sets": "", "notes": "30 not good on form"}, {"date": "2025-08-16", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140/140/140", "sets": "3", "notes": "good form, much easier"}, {"date": "2025-08-16", "exercise": "Calf Raises", "reps": "40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-02", "exercise": "Squat", "reps": "10,10,10", "weight": "165/165/165", "sets": "3", "notes": ""}, {"date": "2025-09-02", "exercise": "Calf Raises", "reps": "50,50", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-02", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125125125", "sets": "3", "notes": "Hard"}, {"date": "2025-09-02", "exercise": "Single Leg RDL", "reps": "10,10", "weight": "30 lb KB one hand", "sets": "2", "notes": ""}, {"date": "2025-09-02", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "135135135", "sets": "3", "notes": "Go up"}, {"date": "2025-09-02", "exercise": "Crunches", "reps": "75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-04", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "110110110", "sets": "3", "notes": "Easing in"}, {"date": "2025-09-04", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "30,30,30", "sets": "", "notes": "move up weight"}, {"date": "2025-09-04", "exercise": "Dips", "reps": "35,35,35", "weight": "", "sets": "", "notes": "Dips way hard"}, {"date": "2025-09-04", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": "Go to 80"}, {"date": "2025-09-04", "exercise": "Hammer Bicep Curls", "reps": "10,10,14", "weight": "25", "sets": "", "notes": "30 not good on form"}, {"date": "2025-09-04", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140/140/140", "sets": "3", "notes": "go to 145"}, {"date": "2025-09-04", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-07", "exercise": "Russian Twist/Crunches", "reps": "50+50,50+50,50+50", "weight": "25 lb", "sets": "", "notes": ""}, {"date": "2025-09-07", "exercise": "Single Leg RDL", "reps": "10", "weight": "30 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-09-13", "exercise": "Squat", "reps": "10,10,10", "weight": "170/170/170", "sets": "3", "notes": ""}, {"date": "2025-09-13", "exercise": "Calf Raises", "reps": "50,50", "weight": "", "sets": "", "notes": "Right calf super tight"}, {"date": "2025-09-13", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125125125", "sets": "3", "notes": "Hard, don't know why I'm stuck at 125. maybe try low reps"}, {"date": "2025-09-13", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "30 lb KB one hand", "sets": "2", "notes": ""}, {"date": "2025-09-13", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "140140140", "sets": "3", "notes": ""}, {"date": "2025-09-13", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-14", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "120/120/120", "sets": "3", "notes": ""}, {"date": "2025-09-14", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "35,35,35", "sets": "", "notes": ""}, {"date": "2025-09-14", "exercise": "Overhead Press", "reps": "10,10,9", "weight": "80,80,80", "sets": "3", "notes": "Tough but good!"}, {"date": "2025-09-14", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": "Tough but good!"}, {"date": "2025-09-14", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": "Good, go up"}, {"date": "2025-09-14", "exercise": "Russian Twist/Crunches", "reps": "50+50,50+50,50+50", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-09-19", "exercise": "Squat", "reps": "10,10,10", "weight": "175/175/175", "sets": "3", "notes": "Go up"}, {"date": "2025-09-19", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Tight on right side"}, {"date": "2025-09-19", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125125125", "sets": "3", "notes": "Hard, don't know why I'm stuck at 125. maybe try low reps"}, {"date": "2025-09-19", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "35 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-09-19", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": "Didn't feel great on form"}, {"date": "2025-09-19", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-23", "exercise": "Lat Pulldown", "reps": "10,7,10", "weight": "130/130/120", "sets": "3", "notes": ""}, {"date": "2025-09-23", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "35,35,35", "sets": "", "notes": ""}, {"date": "2025-09-23", "exercise": "Overhead Press", "reps": "10,10,9", "weight": "80,80,80", "sets": "3", "notes": ""}, {"date": "2025-09-23", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-09-23", "exercise": "Deadlift", "reps": "10,10,10", "weight": "150/150/150", "sets": "3", "notes": ""}, {"date": "2025-09-23", "exercise": "Russian Twist/Crunches", "reps": "50+50,50+50,50+50", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-09-24", "exercise": "Squat", "reps": "10,10,10", "weight": "180/180/180", "sets": "3", "notes": ""}, {"date": "2025-09-24", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Tight on right side"}, {"date": "2025-09-24", "exercise": "Bench Press", "reps": "10,10,8", "weight": "130/130/130", "sets": "3", "notes": ""}, {"date": "2025-09-24", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "40 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-09-24", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": ""}, {"date": "2025-09-24", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-09-29", "exercise": "Lat Pulldown", "reps": "10,7,10", "weight": "125/125/125", "sets": "3", "notes": ""}, {"date": "2025-09-29", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": ""}, {"date": "2025-09-29", "exercise": "Overhead Press", "reps": "10,10,9", "weight": "80,80,80", "sets": "3", "notes": ""}, {"date": "2025-09-29", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-09-29", "exercise": "Deadlift", "reps": "9,10,10", "weight": "155/135/135", "sets": "3", "notes": "Unreasonably hard"}, {"date": "2025-10-01", "exercise": "Russian Twist/Crunches", "reps": "50+75,50+75,50+75", "weight": "25 lb", "sets": "", "notes": ""}, {"date": "2025-10-01", "exercise": "Dips", "reps": "25,25,25", "weight": "", "sets": "", "notes": "Dips way hard"}, {"date": "2025-10-01", "exercise": "Single Leg RDL", "reps": "10", "weight": "40 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-10-03", "exercise": "Squat", "reps": "10,10,10", "weight": "180/180/180", "sets": "3", "notes": ""}, {"date": "2025-10-03", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Tight on right side"}, {"date": "2025-10-03", "exercise": "Bench Press", "reps": "10,10,8", "weight": "130/130/130", "sets": "3", "notes": ""}, {"date": "2025-10-03", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "40 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-10-03", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": ""}, {"date": "2025-10-03", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-10", "exercise": "Lat Pulldown", "reps": "10,7,10", "weight": "125/125/125", "sets": "3", "notes": ""}, {"date": "2025-10-10", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": ""}, {"date": "2025-10-10", "exercise": "Overhead Press", "reps": "10,10,9", "weight": "80,80,80", "sets": "3", "notes": ""}, {"date": "2025-10-10", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-10-10", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": "Much better, need to think about form"}, {"date": "2025-10-10", "exercise": "Russian Twist/Crunches", "reps": "50+50,50+50,50+50", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-10-12", "exercise": "Squat", "reps": "10,10,10", "weight": "185/185/185", "sets": "3", "notes": "Going deeper on squat, feels good"}, {"date": "2025-10-12", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Less tight now"}, {"date": "2025-10-12", "exercise": "Bench Press", "reps": "10,10,9", "weight": "130/130/130", "sets": "3", "notes": "Almost there"}, {"date": "2025-10-12", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "40 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-10-12", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": "Good! try more"}, {"date": "2025-10-12", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-18", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "125/125/125", "sets": "3", "notes": ""}, {"date": "2025-10-18", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": ""}, {"date": "2025-10-18", "exercise": "Overhead Press", "reps": "10,10,7", "weight": "80,80,80", "sets": "3", "notes": "Still ok on weight, just went slower"}, {"date": "2025-10-18", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-10-18", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": ""}, {"date": "2025-10-18", "exercise": "Russian Twist/Crunches", "reps": "60+75,60+75,60+75", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-10-19", "exercise": "Squat", "reps": "10,10,10", "weight": "190/190/190", "sets": "3", "notes": ""}, {"date": "2025-10-19", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-19", "exercise": "Bench Press", "reps": "10,10,9", "weight": "130/130/130", "sets": "3", "notes": ""}, {"date": "2025-10-19", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "45 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-10-19", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "150/150/150", "sets": "3", "notes": ""}, {"date": "2025-10-19", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-24", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "130/130/130", "sets": "3", "notes": ""}, {"date": "2025-10-24", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": ""}, {"date": "2025-10-24", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "80,80,80", "sets": "3", "notes": "Still ok on weight, just went slower"}, {"date": "2025-10-24", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-10-24", "exercise": "Deadlift", "reps": "10,10,10", "weight": "150/150/150", "sets": "3", "notes": ""}, {"date": "2025-10-24", "exercise": "Russian Twist/Crunches", "reps": "60+75,60+75,60+75", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-10-25", "exercise": "Squat", "reps": "10,10,10", "weight": "195/195/195", "sets": "3", "notes": ""}, {"date": "2025-10-25", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-25", "exercise": "Bench Press", "reps": "10,10,8", "weight": "135/135/135", "sets": "3", "notes": "Full plate! went well. keep trying to move up"}, {"date": "2025-10-25", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "45 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-10-25", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "150/150/150", "sets": "3", "notes": "Didn't move up for form reasons"}, {"date": "2025-10-25", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-29", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "130", "sets": "3", "notes": "Back hurting, decided to stop"}, {"date": "2025-10-29", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40", "sets": "", "notes": ""}, {"date": "2025-10-29", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "80,80,80", "sets": "3", "notes": "Still ok on weight, just went slower"}, {"date": "2025-10-29", "exercise": "Hammer Bicep Curls", "reps": "10,10,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-10-29", "exercise": "Deadlift", "reps": "10,10,10", "weight": "155/155/155", "sets": "3", "notes": "hurt back afterwards"}, {"date": "2025-10-29", "exercise": "Russian Twist/Crunches", "reps": "60+75,60+75,60+75", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-10-31", "exercise": "Squat", "reps": "10,10,10", "weight": "155/155/155", "sets": "3", "notes": "Down in weight for back"}, {"date": "2025-10-31", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-10-31", "exercise": "Bench Press", "reps": "8,6,7", "weight": "135/135/135", "sets": "3", "notes": "Felt like shit"}, {"date": "2025-10-31", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "45 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-10-31", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "135/135/135", "sets": "3", "notes": "Down in weight for back"}, {"date": "2025-10-31", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-11-23", "exercise": "Squat", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": "Down on weight to ease back in"}, {"date": "2025-11-23", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-11-23", "exercise": "Bench Press", "reps": "10,8,8", "weight": "125/125/125", "sets": "3", "notes": "Down on weight to ease back in"}, {"date": "2025-11-23", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "45 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-11-23", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "130/130/130", "sets": "3", "notes": "Down on weight to ease back in"}, {"date": "2025-11-23", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-11-23", "exercise": "Overhead Press", "reps": "7,5,", "weight": "80,80,80", "sets": "3", "notes": ""}, {"date": "2025-11-23", "exercise": "Hammer Bicep Curls", "reps": "10,10,10", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-12-02", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "130/120/120", "sets": "3", "notes": "Down in weight for form"}, {"date": "2025-12-02", "exercise": "Single Leg Squat", "reps": "10,10", "weight": "30,30", "sets": "", "notes": "Down in weight for form, hamstring"}, {"date": "2025-12-02", "exercise": "Overhead Press", "reps": "10,8,7", "weight": "80,80,80", "sets": "3", "notes": ""}, {"date": "2025-12-02", "exercise": "Hammer Bicep Curls", "reps": "10,10", "weight": "30,30", "sets": "", "notes": ""}, {"date": "2025-12-02", "exercise": "Deadlift", "reps": "10,10,10", "weight": "135/135/135", "sets": "3", "notes": "Down in weight to be cautious"}, {"date": "2025-12-02", "exercise": "Russian Twist/Crunches", "reps": "60+75,60+75", "weight": "30 lb", "sets": "", "notes": ""}, {"date": "2025-12-05", "exercise": "Squat", "reps": "10,10,X", "weight": "150/150/X", "sets": "3", "notes": "Back slightly off, just pausing to be cautious"}, {"date": "2025-12-05", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-05", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "45 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-12-05", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "105/105/125", "sets": "3", "notes": "Lower due to back"}, {"date": "2025-12-05", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-06", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "130/120/120", "sets": "3", "notes": "Down in weight for form, go up to 125"}, {"date": "2025-12-06", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": ""}, {"date": "2025-12-06", "exercise": "Overhead Press", "reps": "10,10,7", "weight": "80,80,80", "sets": "3", "notes": ""}, {"date": "2025-12-06", "exercise": "Hammer Bicep Curls", "reps": "11,11,11", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2025-12-06", "exercise": "Deadlift", "reps": "10,10,10", "weight": "135/135/135", "sets": "3", "notes": "Down in weight to be cautious, felt good, go up"}, {"date": "2025-12-06", "exercise": "Russian Twist/Crunches", "reps": "60+75,60+75,60+75", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2025-12-12", "exercise": "Squat", "reps": "10,10,11", "weight": "145/145/155", "sets": "3", "notes": "Go up on weight"}, {"date": "2025-12-12", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-12", "exercise": "Bench Press", "reps": "10,7,7", "weight": "130/130/130", "sets": "3", "notes": "130 good for next time"}, {"date": "2025-12-12", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "45 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-12-12", "exercise": "Barbell Row", "reps": "10,10,13", "weight": "130/130/130", "sets": "3", "notes": "Good form, go up"}, {"date": "2025-12-12", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-27", "exercise": "Squat", "reps": "10,10,5,10", "weight": "155/155/155/170", "sets": "3", "notes": "Accidentally started third set with too little weight"}, {"date": "2025-12-27", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-27", "exercise": "Bench Press", "reps": "10,10,5", "weight": "125/125/125", "sets": "3", "notes": "down to ease shoulders"}, {"date": "2025-12-27", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "50 lb KB one hand", "sets": "3", "notes": "Good weight"}, {"date": "2025-12-27", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "135/135/135", "sets": "3", "notes": "Good weight, go up, no shoulder pain"}, {"date": "2025-12-27", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-27", "exercise": "Dips", "reps": "30,30,30", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-31", "exercise": "Squat", "reps": "10,10,10", "weight": "170/170/170", "sets": "3", "notes": "Good weight, tough"}, {"date": "2025-12-31", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2025-12-31", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "50 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2025-12-31", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "140/140/140", "sets": "3", "notes": ""}, {"date": "2025-12-31", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2026-01-01", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "120/120/120", "sets": "3", "notes": "Down in weight for form, go up to 125"}, {"date": "2026-01-01", "exercise": "Single Leg Squat", "reps": "10,10", "weight": "40,40", "sets": "", "notes": ""}, {"date": "2026-01-01", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": ""}, {"date": "2026-01-01", "exercise": "Hammer Bicep Curls", "reps": "10,15", "weight": "30,30", "sets": "", "notes": ""}, {"date": "2026-01-01", "exercise": "Deadlift", "reps": "10,10,10", "weight": "135/135/135", "sets": "3", "notes": "Down in weight to be cautious, felt ok"}, {"date": "2026-01-01", "exercise": "Russian Twist/Crunches", "reps": "60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-01-04", "exercise": "Squat", "reps": "10,10,11", "weight": "175/175/175", "sets": "3", "notes": "Good weight, tough, go up"}, {"date": "2026-01-04", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": ""}, {"date": "2026-01-04", "exercise": "Bench Press", "reps": "10,10,8", "weight": "125/125/125", "sets": "3", "notes": "Still not back"}, {"date": "2026-01-04", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "50 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2026-01-04", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "145/145/145", "sets": "3", "notes": "Good, go up weight."}, {"date": "2026-01-04", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2026-01-07", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "125/125/125", "sets": "3", "notes": ""}, {"date": "2026-01-07", "exercise": "Single Leg Squat", "reps": "10,10", "weight": "40,40", "sets": "", "notes": ""}, {"date": "2026-01-07", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "70,70,70", "sets": "3", "notes": ""}, {"date": "2026-01-07", "exercise": "Hammer Bicep Curls", "reps": "15,13", "weight": "30,30", "sets": "", "notes": ""}, {"date": "2026-01-07", "exercise": "Deadlift", "reps": "10,10,10", "weight": "140/140/140", "sets": "3", "notes": "Good. can go up"}, {"date": "2026-01-07", "exercise": "Russian Twist/Crunches", "reps": "60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-01-08", "exercise": "Squat", "reps": "10,10,10", "weight": "180/180/180", "sets": "3", "notes": "Good weight, tough, go up"}, {"date": "2026-01-08", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Find a new supplemental exercise"}, {"date": "2026-01-08", "exercise": "Bench Press", "reps": "10,10,9", "weight": "125/125/125", "sets": "3", "notes": "Still not back, can do it next"}, {"date": "2026-01-08", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "50 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2026-01-08", "exercise": "Barbell Row", "reps": "10,10,xx", "weight": "150/150/150", "sets": "3", "notes": "Good, go up weight."}, {"date": "2026-01-08", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2026-01-10", "exercise": "Lat Pulldown", "reps": "10,10,11", "weight": "125/125/125", "sets": "3", "notes": "Go to 130"}, {"date": "2026-01-10", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "", "notes": ""}, {"date": "2026-01-10", "exercise": "Overhead Press", "reps": "10,10,10", "weight": "75,75,75", "sets": "3", "notes": ""}, {"date": "2026-01-10", "exercise": "Hammer Bicep Curls", "reps": "15,13,10", "weight": "30,30,30", "sets": "", "notes": ""}, {"date": "2026-01-10", "exercise": "Deadlift", "reps": "10,10,10", "weight": "145/145/145", "sets": "3", "notes": "Good. can go up"}, {"date": "2026-01-10", "exercise": "Russian Twist/Crunches", "reps": "60,60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-01-24", "exercise": "Squat", "reps": "10,10,10", "weight": "185/185/185", "sets": "3", "notes": "Good weight, tough, go up"}, {"date": "2026-01-24", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Find a new supplemental exercise"}, {"date": "2026-01-24", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "50 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2026-01-24", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "155/150/150", "sets": "3", "notes": "150 better for form"}, {"date": "2026-01-24", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2026-01-27", "exercise": "Lat Pulldown", "reps": "10,10,11", "weight": "135/135/135", "sets": "3", "notes": "So hard"}, {"date": "2026-01-27", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "40,40,40", "sets": "3", "notes": "Try 45lb"}, {"date": "2026-01-27", "exercise": "Overhead Press", "reps": "10,10,11", "weight": "80,80,80", "sets": "3", "notes": "Go up to 85"}, {"date": "2026-01-27", "exercise": "Hammer Bicep Curls", "reps": "10,12,15", "weight": "35,30,30", "sets": "3", "notes": "Need to focus on form for 35lb"}, {"date": "2026-01-27", "exercise": "Deadlift", "reps": "10,11,11", "weight": "150/150/150", "sets": "3", "notes": "Go up, feels good"}, {"date": "2026-01-27", "exercise": "Russian Twist/Crunches", "reps": "60,60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-02-04", "exercise": "Squat", "reps": "10,10,10", "weight": "190/190/190", "sets": "3", "notes": "Good weight, tough, go up"}, {"date": "2026-02-04", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "", "notes": "Find a new supplemental exercise"}, {"date": "2026-02-04", "exercise": "Bench Press", "reps": "10,10,8", "weight": "130/130/130", "sets": "3", "notes": "Keep trying"}, {"date": "2026-02-04", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "50 lb KB one hand", "sets": "3", "notes": "go up weight"}, {"date": "2026-02-04", "exercise": "Barbell Row", "reps": "10,10,12", "weight": "150/150/150", "sets": "3", "notes": "go up weight"}, {"date": "2026-02-04", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "", "notes": ""}, {"date": "2026-02-09", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "135/130/130", "sets": "3", "notes": ""}, {"date": "2026-02-09", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": ""}, {"date": "2026-02-09", "exercise": "Overhead Press", "reps": "8,7,6", "weight": "87.6,87.6,87.6", "sets": "3", "notes": "on straight up technogym machine"}, {"date": "2026-02-09", "exercise": "Hammer Bicep Curls", "reps": "10,10,13", "weight": "35,35,35", "sets": "3", "notes": ""}, {"date": "2026-02-09", "exercise": "Deadlift", "reps": "10,11,11", "weight": "155/155/155", "sets": "3", "notes": ""}, {"date": "2026-02-09", "exercise": "Russian Twist/Crunches", "reps": "60,60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-02-14", "exercise": "Squat", "reps": "10,10,10", "weight": "195/195/195", "sets": "3", "notes": "Tough! try more but be careful"}, {"date": "2026-02-14", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "3", "notes": ""}, {"date": "2026-02-14", "exercise": "Bench Press", "reps": "10,10,8", "weight": "135/135/135", "sets": "3", "notes": "I went up! fuck it maybe try 140"}, {"date": "2026-02-14", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "55 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2026-02-14", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "155/155/155", "sets": "3", "notes": "Hard, stay here for form"}, {"date": "2026-02-14", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "3", "notes": ""}, {"date": "2026-02-20", "exercise": "Lat Pulldown", "reps": "10,8,8", "weight": "132.5/132.5/132.5", "sets": "3", "notes": ""}, {"date": "2026-02-20", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": ""}, {"date": "2026-02-20", "exercise": "Overhead Press", "reps": "10,8,8", "weight": "85,85,85", "sets": "3", "notes": "Keep going here"}, {"date": "2026-02-20", "exercise": "Hammer Bicep Curls", "reps": "10,10,13", "weight": "35,35,35", "sets": "3", "notes": ""}, {"date": "2026-02-20", "exercise": "Deadlift", "reps": "10,10,10", "weight": "160/160/160", "sets": "3", "notes": ""}, {"date": "2026-02-20", "exercise": "Russian Twist/Crunches", "reps": "60,60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-02-23", "exercise": "Squat", "reps": "8,8,8", "weight": "200/200/200", "sets": "3", "notes": "Being careful on reps"}, {"date": "2026-02-23", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "3", "notes": ""}, {"date": "2026-02-23", "exercise": "Bench Press", "reps": "10,10,6", "weight": "135/135/135", "sets": "3", "notes": "Hard"}, {"date": "2026-02-23", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "55 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2026-02-23", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "155/155/155", "sets": "3", "notes": "Try higher with 1.25lb plates"}, {"date": "2026-02-23", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "3", "notes": ""}, {"date": "2026-02-28", "exercise": "Lat Pulldown", "reps": "10,10,7", "weight": "132.5/132.5/132.5", "sets": "3", "notes": "Go down weight for form"}, {"date": "2026-02-28", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": ""}, {"date": "2026-02-28", "exercise": "Overhead Press", "reps": "10,8,8", "weight": "85,85,85", "sets": "3", "notes": "Keep going here, tough"}, {"date": "2026-02-28", "exercise": "Hammer Bicep Curls", "reps": "10,10,10", "weight": "35,35,35", "sets": "3", "notes": ""}, {"date": "2026-02-28", "exercise": "Deadlift", "reps": "10,10,10", "weight": "165/165/165", "sets": "3", "notes": ""}, {"date": "2026-02-28", "exercise": "Russian Twist/Crunches", "reps": "60,60,60", "weight": "30 lb", "sets": "3", "notes": ""}, {"date": "2026-03-01", "exercise": "Squat", "reps": "10,10,?", "weight": "190/190/190", "sets": "3", "notes": "Down just for weight availability, but super hard"}, {"date": "2026-03-01", "exercise": "Calf Raises", "reps": "40,40,40", "weight": "", "sets": "3", "notes": ""}, {"date": "2026-03-01", "exercise": "Bench Press", "reps": "10,10,6", "weight": "135/135/135", "sets": "3", "notes": "Hard, keep going"}, {"date": "2026-03-01", "exercise": "Single Leg RDL", "reps": "10,10,10", "weight": "55 lb KB one hand", "sets": "3", "notes": ""}, {"date": "2026-03-01", "exercise": "Barbell Row", "reps": "10,10,10", "weight": "155/155/155", "sets": "3", "notes": "go up to 160"}, {"date": "2026-03-01", "exercise": "Crunches", "reps": "75,75,75", "weight": "", "sets": "3", "notes": ""}, {"date": "2026-03-04", "exercise": "Lat Pulldown", "reps": "10,10,10", "weight": "130/130/130", "sets": "3", "notes": "Go down weight for form"}, {"date": "2026-03-04", "exercise": "Single Leg Squat", "reps": "10,10,10", "weight": "45,45,45", "sets": "3", "notes": ""}, {"date": "2026-03-04", "exercise": "Overhead Press", "reps": "10,8,6", "weight": "85,85,85", "sets": "3", "notes": "Lats kind of hurt (left specifically)"}, {"date": "2026-03-04", "exercise": "Hammer Bicep Curls", "reps": "10,10,10", "weight": "35,35,35", "sets": "3", "notes": ""}, {"date": "2026-03-04", "exercise": "Deadlift", "reps": "10,10,5", "weight": "165/165/165", "sets": "3", "notes": "Back kind of hurt, being quite cautious"}, {"date": "2026-03-04", "exercise": "Russian Twist/Crunches", "reps": "60,60,60", "weight": "30 lb", "sets": "3", "notes": ""}];
+
+load();
+
+// Auto-import historical data on first load, or re-import if parser version changed
+const IMPORT_VERSION = 3; // bump this when parseWeight or import logic changes
+const lastImportVersion = parseInt(localStorage.getItem('ironlog-import-v') || '0');
+if (HISTORICAL_WORKOUTS.length > 0 && (state.workouts.length === 0 || lastImportVersion < IMPORT_VERSION)) {
+  // Remove old imported workouts and re-import with fixed parser
+  state.workouts = state.workouts.filter(w => !w.imported);
+  importHistoricalData();
+  localStorage.setItem('ironlog-import-v', String(IMPORT_VERSION));
+}
+
+renderToday();
+renderHistory();
+
+// Register service worker for PWA / offline support
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// PWA install prompt
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  document.getElementById('installBanner').style.display = 'flex';
+});
+
+function installPWA() {
+  if (!deferredInstallPrompt) return;
+  deferredInstallPrompt.prompt();
+  deferredInstallPrompt.userChoice.then(() => {
+    deferredInstallPrompt = null;
+    document.getElementById('installBanner').style.display = 'none';
+  });
+}
+
+function dismissInstall() {
+  document.getElementById('installBanner').style.display = 'none';
+}
+</script>
+</body>
+</html>
