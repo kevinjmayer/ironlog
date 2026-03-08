@@ -61,7 +61,8 @@
   .nav-item {
     display: flex; flex-direction: column; align-items: center; gap: 2px;
     background: none; border: none; color: var(--text2);
-    font-size: 10px; padding: 4px 12px; cursor: pointer;
+    font-size: 10px; padding: 4px 6px; cursor: pointer;
+    min-width: 0;
   }
   .nav-item.active { color: var(--accent); }
   .nav-item svg { width: 24px; height: 24px; }
@@ -316,6 +317,86 @@
     -webkit-appearance: none;
     appearance: none;
   }
+
+  /* Chat tab */
+  .chat-container {
+    display: flex; flex-direction: column;
+    height: calc(100vh - 140px);
+  }
+  .chat-messages {
+    flex: 1; overflow-y: auto; padding: 8px 0;
+  }
+  .chat-msg {
+    margin-bottom: 12px; padding: 10px 14px;
+    border-radius: 12px; font-size: 14px; line-height: 1.5;
+    max-width: 88%; word-wrap: break-word;
+  }
+  .chat-msg.user {
+    background: var(--accent); color: white;
+    margin-left: auto; border-bottom-right-radius: 4px;
+  }
+  .chat-msg.assistant {
+    background: var(--surface); color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+  .chat-msg.assistant pre {
+    white-space: pre-wrap; font-size: 13px;
+  }
+  .chat-input-row {
+    display: flex; gap: 8px; padding: 8px 0;
+    border-top: 1px solid var(--surface2);
+  }
+  .chat-input-row input {
+    flex: 1; background: var(--surface); border: 1px solid var(--surface2);
+    border-radius: 8px; color: var(--text); font-size: 14px; padding: 10px 12px;
+  }
+  .chat-input-row input:focus { border-color: var(--accent); outline: none; }
+
+  /* AI analysis card */
+  .ai-card {
+    background: var(--surface); border-left: 3px solid var(--green);
+    border-radius: var(--radius); padding: 14px; margin-top: 12px;
+  }
+  .ai-card-title {
+    font-size: 13px; font-weight: 700; color: var(--green);
+    text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .ai-card-body {
+    font-size: 13px; line-height: 1.6; color: var(--text);
+    white-space: pre-wrap;
+  }
+  .ai-loading {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 13px; color: var(--text2);
+  }
+  .ai-loading .dot { animation: blink 1.4s infinite; }
+  .ai-loading .dot:nth-child(2) { animation-delay: 0.2s; }
+  .ai-loading .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%,80%,100%{opacity:0} 40%{opacity:1} }
+
+  /* Swap modal list */
+  .swap-option {
+    padding: 12px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--surface2); margin-bottom: 8px;
+    transition: border-color 0.15s;
+  }
+  .swap-option:hover { border-color: var(--accent); }
+  .swap-option.current { border-color: var(--green); background: rgba(34,197,94,0.08); }
+  .swap-option-name { font-size: 14px; font-weight: 600; }
+  .swap-option-detail { font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+  /* Custom exercise form */
+  .custom-form-row {
+    display: flex; gap: 8px; margin-bottom: 8px; align-items: center;
+  }
+  .custom-form-row label {
+    font-size: 12px; color: var(--text2); min-width: 60px;
+  }
+  .custom-form-row input {
+    flex: 1; background: var(--bg); border: 1px solid var(--surface2);
+    border-radius: 6px; color: var(--text); font-size: 14px; padding: 8px 10px;
+  }
+  .custom-form-row input:focus { border-color: var(--accent); outline: none; }
 </style>
 </head>
 <body>
@@ -335,6 +416,7 @@
 <div id="page-history" class="page"></div>
 <div id="page-progress" class="page"></div>
 <div id="page-plan" class="page"></div>
+<div id="page-coach" class="page"></div>
 
 <!-- Rest Timer -->
 <div class="rest-timer" id="restTimer">
@@ -377,6 +459,10 @@
     <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
     Plan
   </button>
+  <button class="nav-item" onclick="switchPage('coach')" id="nav-coach">
+    <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16h6M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    Coach
+  </button>
 </div>
 
 <!-- Settings Modal -->
@@ -391,6 +477,19 @@
         <button class="btn btn-sm btn-secondary" onclick="setRestDuration(150)" id="rest-150">150s</button>
         <button class="btn btn-sm btn-secondary" onclick="setRestDuration(180)" id="rest-180">180s</button>
       </div>
+    </div>
+    <div class="card" style="background:var(--bg);margin-top:12px">
+      <div class="card-title" style="margin-bottom:12px">AI Coach (Claude)</div>
+      <p style="font-size:13px;color:var(--text-dim);margin:0 0 10px 0;line-height:1.4">
+        Enter your Anthropic API key to enable post-workout analysis and the AI coach chat.
+        Get a key at <a href="https://console.anthropic.com/" target="_blank" style="color:var(--accent)">console.anthropic.com</a>.
+      </p>
+      <div style="display:flex;gap:8px">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-..."
+          style="flex:1;padding:8px 10px;background:var(--card);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box">
+        <button class="btn btn-sm btn-secondary" onclick="saveApiKey()">Save</button>
+      </div>
+      <div id="apiKeyStatus" style="font-size:12px;margin-top:6px;color:var(--green);display:none"></div>
     </div>
     <div class="card" style="background:var(--bg);margin-top:12px">
       <div class="card-title" style="margin-bottom:12px">Google Sheets Backup</div>
@@ -454,8 +553,11 @@
         var r = [w.date, w.dayLabel||'', w.duration||'',
           ex.name, ex.type||'', ex.weight||''];
         var sets = ex.sets || [];
-        for (var i = 0; i < 4; i++)
-          r.push(sets[i] ? sets[i].reps : '');
+        for (var i = 0; i < 4; i++) {
+          if (!sets[i]) { r.push(''); continue; }
+          var hasSetWeight = sets[i].weight !== undefined && sets[i].weight !== ex.weight;
+          r.push(hasSetWeight ? sets[i].reps + '@' + sets[i].weight : sets[i].reps);
+        }
         r.push(ex.note || '');
         rows.push(r);
       });
@@ -547,6 +649,28 @@ function doGet(e) {
   </div>
 </div>
 
+<!-- Swap Accessory Modal -->
+<div class="modal-overlay" id="swapModal">
+  <div class="modal">
+    <div class="modal-title">Swap Accessory Exercise</div>
+    <div id="swapModalContent"></div>
+    <button class="btn btn-secondary btn-block" style="margin-top:12px" onclick="closeSwapModal()">Cancel</button>
+  </div>
+</div>
+
+<!-- Custom Exercise Modal -->
+<div class="modal-overlay" id="customExModal">
+  <div class="modal">
+    <div class="modal-title">Add Custom Exercise</div>
+    <div class="custom-form-row"><label>Name</label><input type="text" id="customExName" placeholder="e.g. Lat Raises"></div>
+    <div class="custom-form-row"><label>Sets</label><input type="number" id="customExSets" value="3" inputmode="numeric"></div>
+    <div class="custom-form-row"><label>Reps</label><input type="number" id="customExReps" value="12" inputmode="numeric"></div>
+    <div class="custom-form-row"><label>Weight</label><input type="number" id="customExWeight" value="0" inputmode="decimal"><span style="font-size:12px;color:var(--text2);margin-left:4px">lbs</span></div>
+    <button class="btn btn-primary btn-block" style="margin-top:12px" onclick="addCustomExercise()">Add to Workout</button>
+    <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="closeCustomExModal()">Cancel</button>
+  </div>
+</div>
+
 <script>
 // ============================================================
 // DATA MODEL & WORKOUT PLAN
@@ -615,6 +739,43 @@ const DEFAULT_WEIGHTS = {
 };
 
 // ============================================================
+// ACCESSORY LIBRARY (for swapping)
+// ============================================================
+
+const ACCESSORY_LIBRARY = {
+  'Push': [
+    { name: 'Dips', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Push', increment: 5 },
+    { name: 'Tricep Pushdown', sets: 3, minReps: 10, maxReps: 15, type: 'accessory', category: 'Push' },
+    { name: 'Close-Grip Bench', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Push', increment: 5 },
+    { name: 'Overhead Tricep Extension', sets: 3, minReps: 10, maxReps: 15, type: 'accessory', category: 'Push' },
+  ],
+  'Pull': [
+    { name: 'Hammer Bicep Curls', sets: 3, minReps: 8, maxReps: 15, type: 'accessory', category: 'Pull' },
+    { name: 'Barbell Curls', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Pull' },
+    { name: 'Chin-Ups', sets: 3, minReps: 5, maxReps: 12, type: 'accessory', category: 'Pull' },
+    { name: 'Cable Rows', sets: 3, minReps: 10, maxReps: 15, type: 'accessory', category: 'Pull' },
+  ],
+  'Rear Delt': [
+    { name: 'Face Pulls', sets: 3, minReps: 15, maxReps: 25, type: 'accessory', category: 'Rear Delt' },
+    { name: 'Reverse Flyes', sets: 3, minReps: 12, maxReps: 20, type: 'accessory', category: 'Rear Delt' },
+    { name: 'Band Pull-Aparts', sets: 3, minReps: 15, maxReps: 25, type: 'accessory', category: 'Rear Delt' },
+  ],
+  'Legs': [
+    { name: 'Single Leg RDL', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Legs' },
+    { name: 'Single Leg Squat', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Legs' },
+    { name: 'Bulgarian Split Squat', sets: 3, minReps: 8, maxReps: 12, type: 'accessory', category: 'Legs', increment: 5 },
+    { name: 'Leg Curls', sets: 3, minReps: 10, maxReps: 15, type: 'accessory', category: 'Legs' },
+    { name: 'Leg Press', sets: 3, minReps: 10, maxReps: 15, type: 'accessory', category: 'Legs', increment: 10 },
+  ],
+  'Core': [
+    { name: 'Crunches', sets: 3, minReps: 50, maxReps: 75, type: 'accessory', category: 'Core' },
+    { name: 'Hanging Leg Raise', sets: 3, minReps: 8, maxReps: 15, type: 'accessory', category: 'Core' },
+    { name: 'Pallof Press', sets: 3, minReps: 10, maxReps: 15, type: 'accessory', category: 'Core' },
+    { name: 'Ab Wheel', sets: 3, minReps: 8, maxReps: 15, type: 'accessory', category: 'Core' },
+  ],
+};
+
+// ============================================================
 // STATE
 // ============================================================
 
@@ -625,6 +786,8 @@ let state = {
   restDuration: 120,
   timerInterval: null,
   timerRemaining: 0,
+  programOverrides: {},  // accessory swaps keyed by "dayA-0", "dayB-2", etc.
+  chatHistory: [],       // AI coach chat messages
 };
 
 function save() {
@@ -712,6 +875,7 @@ function renderToday() {
   }
 
   const day = PROGRAM[state.nextDay];
+  const blocks = getEffectiveBlocks(state.nextDay);
 
   let html = `
     <div class="workout-indicator">
@@ -720,11 +884,12 @@ function renderToday() {
     </div>
   `;
 
-  day.blocks.forEach((block, bi) => {
+  blocks.forEach((block, bi) => {
     const mainTarget = getTargetForExercise(block.main);
     const accTarget = getTargetForExercise(block.accessory);
     const lastMain = getLastWorkoutForExercise(block.main.name);
     const lastMainNote = lastMain && lastMain.note ? lastMain.note : '';
+    const isOverridden = !!state.programOverrides[`${state.nextDay}-${bi}`];
 
     html += `<div class="section-header">Block ${bi + 1}</div>`;
     html += `
@@ -741,10 +906,14 @@ function renderToday() {
         </div>
         ${lastMainNote ? `<div style="font-size:12px;color:var(--yellow);margin-top:4px;font-style:italic">Last note: ${lastMainNote}</div>` : ''}
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--surface2)">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);margin-bottom:4px">⇄ Between sets</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim)">⇄ Between sets</div>
+            <button class="btn-icon" style="width:28px;height:28px;font-size:14px" onclick="openSwapModal('${state.nextDay}',${bi})" title="Swap exercise">🔄</button>
+          </div>
           <div class="exercise-name" style="font-size:14px">
             ${block.accessory.name}
             <span class="exercise-tag tag-accessory">${block.accessory.category}</span>
+            ${isOverridden ? '<span style="font-size:10px;color:var(--orange);margin-left:4px">swapped</span>' : ''}
           </div>
           <div class="exercise-target" style="font-size:13px">
             ${block.accessory.sets} sets × ${accTarget.targetReps} reps${accTarget.weight ? ` @ <strong>${accTarget.weight} lbs</strong>` : ''}
@@ -768,10 +937,12 @@ function renderToday() {
 
 function startWorkout() {
   const day = PROGRAM[state.nextDay];
-  const allExercises = getDayExercises(day);
+  const effectiveBlocks = getEffectiveBlocks(state.nextDay);
+  const allExercises = [];
+  effectiveBlocks.forEach(b => { allExercises.push(b.main); allExercises.push(b.accessory); });
 
   // Build blocks metadata for active workout rendering
-  const blocks = day.blocks.map(b => ({
+  const blocks = effectiveBlocks.map(b => ({
     mainName: b.main.name,
     accName: b.accessory.name,
   }));
@@ -838,7 +1009,20 @@ function renderActiveWorkout(page) {
     });
   }
 
+  // Render any custom exercises added during workout
+  const customExercises = w.exercises.filter(e => e.isCustom);
+  if (customExercises.length > 0) {
+    html += `<div class="section-header">Custom Exercises</div>`;
+    customExercises.forEach(ex => {
+      const exIdx = w.exercises.indexOf(ex);
+      html += renderExerciseInput(ex, exIdx);
+    });
+  }
+
   html += `
+    <button class="btn btn-secondary btn-block" style="margin-top:12px" onclick="openCustomExModal()">
+      + Add Exercise
+    </button>
     <div class="card" style="margin-top:16px">
       <div class="card-title" style="margin-bottom:8px">Workout Notes</div>
       <textarea class="notes-input" placeholder="How did it feel?" onchange="state.currentWorkout.notes=this.value;save()">${w.notes || ''}</textarea>
@@ -846,6 +1030,7 @@ function renderActiveWorkout(page) {
     <button class="btn btn-success btn-block" style="margin-top:12px;padding:14px" onclick="finishWorkout()">
       Finish Workout
     </button>
+    <div id="postWorkoutAI"></div>
     <button class="btn btn-secondary btn-block" style="margin-top:8px" onclick="cancelWorkout()">
       Cancel Workout
     </button>
@@ -856,12 +1041,13 @@ function renderActiveWorkout(page) {
 
 function renderExerciseInput(ex, exIdx) {
   const allDone = ex.sets.every(s => s.done);
+  const hasPerSetWeight = ex.perSetWeight || false;
   let html = `
     <div class="exercise-block card">
       <div class="exercise-name">
         ${allDone ? '✓ ' : ''}${ex.name}
         <span class="exercise-tag ${ex.type === 'main' ? 'tag-main' : 'tag-accessory'}">
-          ${ex.type === 'main' ? 'Main' : ex.category}
+          ${ex.type === 'main' ? 'Main' : (ex.isCustom ? 'Custom' : ex.category)}
         </span>
       </div>
       <div class="exercise-target" style="margin-bottom:10px">
@@ -870,29 +1056,58 @@ function renderExerciseInput(ex, exIdx) {
       <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <label style="font-size:12px;color:var(--text2)">Weight:</label>
         <input type="number" class="set-input" style="width:80px" value="${ex.weight}"
-          onchange="updateWeight(${exIdx}, this.value)" inputmode="decimal">
+          onchange="updateWeight(${exIdx}, this.value)" inputmode="decimal"${hasPerSetWeight ? ' disabled' : ''}>
         <span style="font-size:12px;color:var(--text2)">lbs</span>
+        <a href="#" onclick="togglePerSetWeight(${exIdx});return false"
+          style="font-size:11px;color:var(--accent);margin-left:auto;white-space:nowrap">
+          ${hasPerSetWeight ? '← single weight' : 'per-set ↓'}
+        </a>
       </div>
-      <div class="sets-grid">
+  `;
+
+  if (hasPerSetWeight) {
+    // Per-set weight mode: each row gets weight + reps
+    html += `<div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:6px;align-items:center">
+      <div class="set-header"></div>
+      <div class="set-header">Weight</div>
+      <div class="set-header">Reps</div>
+      <div class="set-header"></div>`;
+
+    ex.sets.forEach((set, si) => {
+      const setWeight = set.weight !== undefined ? set.weight : ex.weight;
+      html += `
+        <div class="set-label">S${si + 1}</div>
+        <input type="number" class="set-input" value="${setWeight}" placeholder="${ex.weight}"
+          inputmode="decimal" onchange="updateSetWeight(${exIdx}, ${si}, this.value)">
+        <input type="number" class="set-input" value="${set.reps || ''}" placeholder="${ex.targetReps}"
+          inputmode="numeric" onchange="updateReps(${exIdx}, ${si}, this.value)">
+        <button class="set-check ${set.done ? 'done' : ''}" onclick="toggleSet(${exIdx}, ${si})">
+          ${set.done ? '✓' : ''}
+        </button>
+      `;
+    });
+    html += `</div>`;
+  } else {
+    // Standard mode: single weight, per-set reps
+    html += `<div class="sets-grid">
         <div class="set-header"></div>
         <div class="set-header">Reps</div>
         <div class="set-header"></div>
-        <div class="set-header"></div>
-  `;
+        <div class="set-header"></div>`;
 
-  ex.sets.forEach((set, si) => {
-    html += `
-      <div class="set-label">S${si + 1}</div>
-      <input type="number" class="set-input" value="${set.reps || ''}" placeholder="${ex.targetReps}"
-        inputmode="numeric" onchange="updateReps(${exIdx}, ${si}, this.value)">
-      <div></div>
-      <button class="set-check ${set.done ? 'done' : ''}" onclick="toggleSet(${exIdx}, ${si})">
-        ${set.done ? '✓' : ''}
-      </button>
-    `;
-  });
-
-  html += `</div>`;
+    ex.sets.forEach((set, si) => {
+      html += `
+        <div class="set-label">S${si + 1}</div>
+        <input type="number" class="set-input" value="${set.reps || ''}" placeholder="${ex.targetReps}"
+          inputmode="numeric" onchange="updateReps(${exIdx}, ${si}, this.value)">
+        <div></div>
+        <button class="set-check ${set.done ? 'done' : ''}" onclick="toggleSet(${exIdx}, ${si})">
+          ${set.done ? '✓' : ''}
+        </button>
+      `;
+    });
+    html += `</div>`;
+  }
 
   // Note field
   html += `
@@ -905,8 +1120,31 @@ function renderExerciseInput(ex, exIdx) {
 }
 
 function updateWeight(exIdx, val) {
-  state.currentWorkout.exercises[exIdx].weight = parseFloat(val) || 0;
+  const ex = state.currentWorkout.exercises[exIdx];
+  ex.weight = parseFloat(val) || 0;
+  // If per-set mode was off, also update any set weights to match
+  if (!ex.perSetWeight) {
+    ex.sets.forEach(s => { s.weight = ex.weight; });
+  }
   save();
+}
+
+function updateSetWeight(exIdx, setIdx, val) {
+  state.currentWorkout.exercises[exIdx].sets[setIdx].weight = parseFloat(val) || 0;
+  save();
+}
+
+function togglePerSetWeight(exIdx) {
+  const ex = state.currentWorkout.exercises[exIdx];
+  ex.perSetWeight = !ex.perSetWeight;
+  if (ex.perSetWeight) {
+    // Initialize each set's weight from the exercise weight
+    ex.sets.forEach(s => {
+      if (s.weight === undefined) s.weight = ex.weight;
+    });
+  }
+  save();
+  renderToday();
 }
 
 function updateReps(exIdx, setIdx, val) {
@@ -939,7 +1177,7 @@ function finishWorkout() {
 
   const completed = {
     id: Date.now(),
-    date: new Date().toISOString().slice(0, 10),
+    date: localDateStr(),
     day: w.day,
     dayLabel: w.dayLabel,
     duration: Math.floor((Date.now() - w.startTime) / 60000),
@@ -947,8 +1185,13 @@ function finishWorkout() {
       name: ex.name,
       type: ex.type,
       weight: ex.weight,
-      sets: ex.sets.map(s => ({ reps: s.reps })),
-      note: ex.note || ''
+      sets: ex.sets.map(s => {
+        const setData = { reps: s.reps };
+        if (s.weight !== undefined) setData.weight = s.weight;
+        return setData;
+      }),
+      note: ex.note || '',
+      isCustom: ex.isCustom || false,
     })),
     notes: w.notes || ''
   };
@@ -959,11 +1202,34 @@ function finishWorkout() {
 
   stopTimer();
   save();
-  renderToday();
+
+  // Show completion summary with AI analysis placeholder
+  const page = document.getElementById('page-today');
+  let summaryHtml = `
+    <div class="card" style="text-align:center;margin-top:20px">
+      <div style="font-size:24px;margin-bottom:8px">💪</div>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px">Workout Complete!</div>
+      <div style="font-size:14px;color:var(--text2)">${completed.dayLabel} — ${completed.duration} min</div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="margin-bottom:8px">Summary</div>
+  `;
+  completed.exercises.forEach(ex => {
+    const reps = ex.sets.map(s => s.reps).join('/');
+    summaryHtml += `<div style="font-size:13px;padding:3px 0;color:var(--text2)">${ex.name}: ${reps} @ ${ex.weight || 'BW'} lbs</div>`;
+  });
+  summaryHtml += `</div>`;
+  summaryHtml += `<div id="postWorkoutAI"></div>`;
+  summaryHtml += `<button class="btn btn-primary btn-block" style="margin-top:16px" onclick="renderToday()">Done</button>`;
+  page.innerHTML = summaryHtml;
+
   renderHistory();
 
   // Auto-backup to Google Sheets (runs in background, won't block UI)
   autoBackup();
+
+  // Trigger AI analysis (async, non-blocking)
+  analyzeWorkout(completed);
 }
 
 function cancelWorkout() {
@@ -1066,11 +1332,17 @@ function showWorkoutDetail(id) {
   let html = `<div class="modal-title">${w.dayLabel} — ${formatDate(new Date(w.date))}</div>`;
 
   w.exercises.forEach(ex => {
-    const repsStr = ex.sets.map(s => s.reps).join(' / ');
+    const hasVaryingWeights = ex.sets.some(s => s.weight !== undefined && s.weight !== ex.weight);
+    let detailStr;
+    if (hasVaryingWeights) {
+      detailStr = ex.sets.map(s => `${s.reps}@${s.weight !== undefined ? s.weight : ex.weight}`).join(' / ') + ' lbs';
+    } else {
+      detailStr = ex.sets.map(s => s.reps).join(' / ') + ` @ ${ex.weight || 'BW'} lbs`;
+    }
     html += `
       <div style="padding:8px 0;border-bottom:1px solid var(--surface2)">
         <div style="font-weight:600;font-size:14px">${ex.name}</div>
-        <div style="font-size:13px;color:var(--text2)">${repsStr} @ ${ex.weight || 'BW'} lbs</div>
+        <div style="font-size:13px;color:var(--text2)">${detailStr}</div>
         ${ex.note ? `<div style="font-size:12px;color:var(--yellow);margin-top:2px">${ex.note}</div>` : ''}
       </div>
     `;
@@ -1078,6 +1350,10 @@ function showWorkoutDetail(id) {
 
   if (w.notes) {
     html += `<div style="margin-top:12px;font-size:13px;color:var(--text2)">${w.notes}</div>`;
+  }
+
+  if (w.aiAnalysis) {
+    html += `<div class="ai-card" style="margin-top:12px"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${escapeHtml(w.aiAnalysis)}</div></div>`;
   }
 
   html += `<button class="btn btn-primary btn-block" style="margin-top:16px" onclick="closeSettings()">Close</button>`;
@@ -1306,13 +1582,15 @@ function renderPlan() {
 
   ['dayA', 'dayB'].forEach(dayKey => {
     const day = PROGRAM[dayKey];
+    const effBlocks = getEffectiveBlocks(dayKey);
     html += `
       <div class="card">
         <div class="card-title" style="color:${dayKey === 'dayA' ? 'var(--accent)' : 'var(--orange)'}">${day.label}</div>
         <div style="margin-top:8px">
     `;
 
-    day.blocks.forEach((block, bi) => {
+    effBlocks.forEach((block, bi) => {
+      const isOverridden = !!state.programOverrides[`${dayKey}-${bi}`];
       html += `
         <div style="padding:8px 0;${bi > 0 ? 'margin-top:6px;border-top:2px solid var(--surface2)' : ''}">
           <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-dim);margin-bottom:4px">Block ${bi+1}</div>
@@ -1324,12 +1602,14 @@ function renderPlan() {
             <span style="font-size:13px;color:var(--text2)">${block.main.sets} × ${block.main.minReps}–${block.main.maxReps}</span>
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;padding-left:12px;border-left:2px solid var(--surface2)">
-            <div>
+            <div style="flex:1">
               <span style="font-size:11px;color:var(--text-dim)">⇄ </span>
               <span style="font-size:13px;color:var(--text2)">${block.accessory.name}</span>
               <span class="exercise-tag tag-accessory" style="margin-left:4px">${block.accessory.category}</span>
+              ${isOverridden ? '<span style="font-size:10px;color:var(--orange);margin-left:4px">swapped</span>' : ''}
             </div>
-            <span style="font-size:12px;color:var(--text-dim)">${block.accessory.sets} × ${block.accessory.minReps}–${block.accessory.maxReps}</span>
+            <span style="font-size:12px;color:var(--text-dim);margin-right:6px">${block.accessory.sets} × ${block.accessory.minReps}–${block.accessory.maxReps}</span>
+            <button class="btn-icon" style="width:24px;height:24px;font-size:12px;flex-shrink:0" onclick="openSwapModal('${dayKey}',${bi})" title="Swap">🔄</button>
           </div>
         </div>
       `;
@@ -1378,6 +1658,13 @@ function showSettings() {
     const el = document.getElementById(`rest-${d}`);
     if (el) el.className = `btn btn-sm ${d === state.restDuration ? 'btn-primary' : 'btn-secondary'}`;
   });
+  // Load saved API key
+  const apiInput = document.getElementById('apiKeyInput');
+  if (apiInput) {
+    const key = getApiKey();
+    apiInput.value = key;
+  }
+  document.getElementById('apiKeyStatus').style.display = 'none';
   // Load saved Sheets URL
   const urlInput = document.getElementById('sheetsUrl');
   if (urlInput) urlInput.value = getSheetsUrl();
@@ -1400,7 +1687,7 @@ function exportData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `ironlog-export-${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `ironlog-export-${localDateStr()}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -1605,6 +1892,406 @@ async function autoBackup() {
 }
 
 // ============================================================
+// ANTHROPIC API & AI FEATURES
+// ============================================================
+
+function getApiKey() {
+  return localStorage.getItem('ironlog-api-key') || '';
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem('ironlog-api-key', key);
+  const el = document.getElementById('apiKeyStatus');
+  el.style.display = 'block';
+  el.textContent = key ? 'API key saved.' : 'API key cleared.';
+  setTimeout(() => { el.style.display = 'none'; }, 2000);
+}
+
+async function callClaude(systemPrompt, userMessage, opts = {}) {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('No API key configured');
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: opts.model || 'claude-sonnet-4-20250514',
+      max_tokens: opts.maxTokens || 1024,
+      system: systemPrompt,
+      messages: Array.isArray(userMessage) ? userMessage : [{ role: 'user', content: userMessage }],
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.error?.message || `API error ${res.status}`);
+  }
+
+  const data = await res.json();
+  return data.content?.[0]?.text || '';
+}
+
+// Build a summary of recent workouts for AI context
+function buildWorkoutContext(days = 90) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = localDateStr(cutoff);
+
+  const recent = state.workouts.filter(w => w.date >= cutoffStr);
+  if (recent.length === 0) return 'No workout data in the last ' + days + ' days.';
+
+  let summary = `Workout history (last ${days} days, ${recent.length} sessions):\n`;
+  recent.forEach(w => {
+    summary += `\n${w.date} (${w.dayLabel}, ${w.duration || '?'}min):`;
+    w.exercises.forEach(ex => {
+      const reps = ex.sets.map(s => s.reps).join('/');
+      summary += `\n  ${ex.name} (${ex.type}): ${reps} @ ${ex.weight || 'BW'} lbs`;
+      if (ex.note) summary += ` [Note: ${ex.note}]`;
+    });
+    if (w.notes) summary += `\n  Session notes: ${w.notes}`;
+  });
+  return summary;
+}
+
+function buildProgramContext() {
+  let ctx = 'Current program (double progression 3x8-12, add weight at 3x12):\n';
+  ['dayA', 'dayB'].forEach(dayKey => {
+    const day = PROGRAM[dayKey];
+    ctx += `\n${day.label}:`;
+    const eff = getEffectiveBlocks(dayKey);
+    eff.forEach((b, i) => {
+      ctx += `\n  Block ${i+1}: ${b.main.name} (${b.main.sets}x${b.main.minReps}-${b.main.maxReps}, +${b.main.increment}lbs)`;
+      ctx += `\n    Superset: ${b.accessory.name} (${b.accessory.sets}x${b.accessory.minReps}-${b.accessory.maxReps}, ${b.accessory.category})`;
+    });
+  });
+  return ctx;
+}
+
+// Post-workout analysis
+async function analyzeWorkout(workout) {
+  const apiKey = getApiKey();
+  if (!apiKey) return;
+
+  const analysisEl = document.getElementById('postWorkoutAI');
+  if (!analysisEl) return;
+  analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-loading">Analyzing your workout<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div></div>`;
+
+  const systemPrompt = `You are a knowledgeable, supportive strength coach. The user just completed a workout. Analyze it in the context of their recent history. Be concise: 3-5 bullet points max. Focus on:
+- Progress trends (weight/rep improvements or stalls)
+- Form or volume concerns based on their notes
+- Specific, actionable suggestions
+- Encouragement where warranted
+Keep it brief and practical. Use plain text, no markdown headers.`;
+
+  const thisWorkout = `Just completed (${workout.dayLabel}, ${workout.date}, ${workout.duration}min):\n` +
+    workout.exercises.map(ex => {
+      const reps = ex.sets.map(s => s.reps).join('/');
+      return `${ex.name} (${ex.type}): ${reps} @ ${ex.weight || 'BW'} lbs${ex.note ? ` [${ex.note}]` : ''}`;
+    }).join('\n') +
+    (workout.notes ? `\nSession notes: ${workout.notes}` : '');
+
+  const context = buildWorkoutContext(90);
+  const program = buildProgramContext();
+
+  try {
+    const analysis = await callClaude(systemPrompt, `${program}\n\n${context}\n\n${thisWorkout}`);
+
+    // Store in workout
+    const idx = state.workouts.findIndex(w => w.id === workout.id);
+    if (idx >= 0) {
+      state.workouts[idx].aiAnalysis = analysis;
+      save();
+    }
+
+    analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${escapeHtml(analysis)}</div></div>`;
+  } catch (err) {
+    analysisEl.innerHTML = `<div class="ai-card" style="border-left-color:var(--red)"><div class="ai-card-title" style="color:var(--red)">Analysis Error</div><div class="ai-card-body" style="color:var(--text2)">${escapeHtml(err.message)}</div></div>`;
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+// ============================================================
+// AI COACH CHAT
+// ============================================================
+
+function renderCoach() {
+  const page = document.getElementById('page-coach');
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    page.innerHTML = `
+      <div class="empty-state">
+        <svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16h6M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <div>AI Coach requires an API key</div>
+        <div style="margin-top:8px;font-size:13px">Go to Settings and enter your Anthropic API key to start chatting.</div>
+        <button class="btn btn-primary btn-sm" style="margin-top:12px" onclick="showSettings()">Open Settings</button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = `<div class="chat-container">`;
+  html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0 8px">
+    <div style="font-size:13px;color:var(--text2)">Ask your AI coach about training, form, programming...</div>
+    <button class="btn btn-sm btn-secondary" onclick="clearChat()" style="font-size:11px;padding:4px 8px">Clear</button>
+  </div>`;
+  html += `<div class="chat-messages" id="chatMessages">`;
+
+  if (state.chatHistory.length === 0) {
+    html += `<div style="text-align:center;padding:40px 20px;color:var(--text2);font-size:13px">
+      Ask me anything about your training! I have access to your workout history and program.
+    </div>`;
+  } else {
+    state.chatHistory.forEach(msg => {
+      html += `<div class="chat-msg ${msg.role}">${escapeHtml(msg.content)}</div>`;
+    });
+  }
+
+  html += `</div>`;
+  html += `<div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Ask your coach..." onkeydown="if(event.key==='Enter')sendChat()">
+    <button class="btn btn-primary btn-sm" onclick="sendChat()">Send</button>
+  </div>`;
+  html += `</div>`;
+
+  page.innerHTML = html;
+
+  // Scroll to bottom
+  const msgs = document.getElementById('chatMessages');
+  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const msg = (input.value || '').trim();
+  if (!msg) return;
+
+  input.value = '';
+  state.chatHistory.push({ role: 'user', content: msg });
+  save();
+  renderCoach();
+
+  // Show typing indicator
+  const msgs = document.getElementById('chatMessages');
+  const typingEl = document.createElement('div');
+  typingEl.className = 'chat-msg assistant';
+  typingEl.innerHTML = '<div class="ai-loading">Thinking<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div>';
+  msgs.appendChild(typingEl);
+  msgs.scrollTop = msgs.scrollHeight;
+
+  const systemPrompt = `You are an expert strength coach embedded in a workout tracking app called Iron Log. You have access to the user's program and recent workout history. Be helpful, concise, and practical. Give specific advice based on their actual data when relevant. Keep responses focused and under 200 words unless the question requires more detail.
+
+${buildProgramContext()}
+
+${buildWorkoutContext(90)}`;
+
+  // Build messages array for multi-turn
+  const messages = state.chatHistory.map(m => ({ role: m.role, content: m.content }));
+
+  try {
+    const reply = await callClaude(systemPrompt, messages, { maxTokens: 800 });
+    state.chatHistory.push({ role: 'assistant', content: reply });
+    save();
+  } catch (err) {
+    state.chatHistory.push({ role: 'assistant', content: 'Error: ' + err.message });
+    save();
+  }
+
+  renderCoach();
+}
+
+function clearChat() {
+  if (state.chatHistory.length === 0) return;
+  if (confirm('Clear chat history?')) {
+    state.chatHistory = [];
+    save();
+    renderCoach();
+  }
+}
+
+// ============================================================
+// ACCESSORY EXERCISE SWAPPING
+// ============================================================
+
+function getEffectiveBlocks(dayKey) {
+  const day = PROGRAM[dayKey];
+  return day.blocks.map((block, bi) => {
+    const overrideKey = `${dayKey}-${bi}`;
+    const override = state.programOverrides[overrideKey];
+    return {
+      main: block.main,
+      accessory: override || block.accessory,
+    };
+  });
+}
+
+function getEffectiveDayExercises(dayKey) {
+  const blocks = getEffectiveBlocks(dayKey);
+  const list = [];
+  blocks.forEach(b => { list.push(b.main); list.push(b.accessory); });
+  return list;
+}
+
+let _swapContext = null; // { dayKey, blockIndex }
+
+function openSwapModal(dayKey, blockIndex) {
+  _swapContext = { dayKey, blockIndex };
+  const block = getEffectiveBlocks(dayKey)[blockIndex];
+  const currentAcc = block.accessory;
+  const category = currentAcc.category;
+
+  // Get options from same category
+  const options = ACCESSORY_LIBRARY[category] || [];
+
+  let html = `<div style="font-size:13px;color:var(--text2);margin-bottom:12px">Category: <strong style="color:var(--text)">${category}</strong></div>`;
+
+  options.forEach(opt => {
+    const isCurrent = opt.name === currentAcc.name;
+    html += `
+      <div class="swap-option ${isCurrent ? 'current' : ''}" onclick="selectSwap('${opt.name}')">
+        <div class="swap-option-name">${opt.name} ${isCurrent ? '(current)' : ''}</div>
+        <div class="swap-option-detail">${opt.sets}x${opt.minReps}-${opt.maxReps}${opt.increment ? `, +${opt.increment}lbs` : ''}</div>
+      </div>
+    `;
+  });
+
+  // Custom option
+  html += `
+    <div style="margin-top:12px;border-top:1px solid var(--surface2);padding-top:12px">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:8px">Or add a custom exercise:</div>
+      <div class="custom-form-row"><label>Name</label><input type="text" id="swapCustomName" placeholder="Exercise name"></div>
+      <div class="custom-form-row"><label>Sets</label><input type="number" id="swapCustomSets" value="3" inputmode="numeric"></div>
+      <div class="custom-form-row"><label>Min Reps</label><input type="number" id="swapCustomMinReps" value="8" inputmode="numeric"></div>
+      <div class="custom-form-row"><label>Max Reps</label><input type="number" id="swapCustomMaxReps" value="12" inputmode="numeric"></div>
+      <div class="custom-form-row"><label>Increment</label><input type="number" id="swapCustomIncrement" value="0" inputmode="decimal"><span style="font-size:12px;color:var(--text2);margin-left:4px">lbs (0 = no auto-increment)</span></div>
+      <button class="btn btn-sm btn-primary btn-block" style="margin-top:8px" onclick="selectCustomSwap()">Use Custom</button>
+    </div>
+  `;
+
+  // Reset to default option
+  const overrideKey = `${dayKey}-${blockIndex}`;
+  if (state.programOverrides[overrideKey]) {
+    const defaultName = PROGRAM[dayKey].blocks[blockIndex].accessory.name;
+    html += `<button class="btn btn-sm btn-secondary btn-block" style="margin-top:8px" onclick="resetSwap()">Reset to Default (${defaultName})</button>`;
+  }
+
+  document.getElementById('swapModalContent').innerHTML = html;
+  document.getElementById('swapModal').classList.add('show');
+}
+
+function selectSwap(exerciseName) {
+  if (!_swapContext) return;
+  const { dayKey, blockIndex } = _swapContext;
+  const category = getEffectiveBlocks(dayKey)[blockIndex].accessory.category;
+  const options = ACCESSORY_LIBRARY[category] || [];
+  const chosen = options.find(o => o.name === exerciseName);
+  if (!chosen) return;
+
+  const overrideKey = `${dayKey}-${blockIndex}`;
+  // If it's the same as the default, remove override
+  if (PROGRAM[dayKey].blocks[blockIndex].accessory.name === exerciseName) {
+    delete state.programOverrides[overrideKey];
+  } else {
+    state.programOverrides[overrideKey] = { ...chosen };
+  }
+  save();
+  closeSwapModal();
+  renderToday();
+  renderPlan();
+}
+
+function selectCustomSwap() {
+  if (!_swapContext) return;
+  const name = (document.getElementById('swapCustomName').value || '').trim();
+  if (!name) { alert('Please enter an exercise name'); return; }
+
+  const { dayKey, blockIndex } = _swapContext;
+  const category = getEffectiveBlocks(dayKey)[blockIndex].accessory.category;
+
+  const custom = {
+    name: name,
+    sets: parseInt(document.getElementById('swapCustomSets').value) || 3,
+    minReps: parseInt(document.getElementById('swapCustomMinReps').value) || 8,
+    maxReps: parseInt(document.getElementById('swapCustomMaxReps').value) || 12,
+    type: 'accessory',
+    category: category,
+    increment: parseFloat(document.getElementById('swapCustomIncrement').value) || 0,
+  };
+
+  state.programOverrides[`${dayKey}-${blockIndex}`] = custom;
+  save();
+  closeSwapModal();
+  renderToday();
+  renderPlan();
+}
+
+function resetSwap() {
+  if (!_swapContext) return;
+  const { dayKey, blockIndex } = _swapContext;
+  delete state.programOverrides[`${dayKey}-${blockIndex}`];
+  save();
+  closeSwapModal();
+  renderToday();
+  renderPlan();
+}
+
+function closeSwapModal() {
+  document.getElementById('swapModal').classList.remove('show');
+  _swapContext = null;
+}
+
+// ============================================================
+// CUSTOM ONE-TIME EXERCISES
+// ============================================================
+
+function openCustomExModal() {
+  document.getElementById('customExName').value = '';
+  document.getElementById('customExSets').value = '3';
+  document.getElementById('customExReps').value = '12';
+  document.getElementById('customExWeight').value = '0';
+  document.getElementById('customExModal').classList.add('show');
+}
+
+function closeCustomExModal() {
+  document.getElementById('customExModal').classList.remove('show');
+}
+
+function addCustomExercise() {
+  const name = (document.getElementById('customExName').value || '').trim();
+  if (!name) { alert('Please enter an exercise name'); return; }
+  if (!state.currentWorkout) return;
+
+  const numSets = parseInt(document.getElementById('customExSets').value) || 3;
+  const reps = parseInt(document.getElementById('customExReps').value) || 12;
+  const weight = parseFloat(document.getElementById('customExWeight').value) || 0;
+
+  state.currentWorkout.exercises.push({
+    name: name,
+    type: 'custom',
+    category: 'Custom',
+    template: { name, sets: numSets, minReps: reps, maxReps: reps, type: 'custom' },
+    weight: weight,
+    targetReps: reps,
+    sets: Array.from({length: numSets}, () => ({ reps: 0, done: false })),
+    note: '',
+    isCustom: true,
+  });
+
+  save();
+  closeCustomExModal();
+  renderToday();
+}
+
+// ============================================================
 // NAVIGATION & UTILITIES
 // ============================================================
 
@@ -1618,12 +2305,22 @@ function switchPage(name) {
   if (name === 'history') renderHistory();
   if (name === 'progress') renderProgress();
   if (name === 'plan') renderPlan();
+  if (name === 'coach') renderCoach();
 }
 
 function formatDate(d) {
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
+}
+
+// Local date string (YYYY-MM-DD) — uses device timezone, not UTC
+function localDateStr(d) {
+  d = d || new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 // ============================================================

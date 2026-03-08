@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironlog-v1';
+const CACHE_NAME = 'ironlog-v2';
 const ASSETS = [
   './',
   './workout-app.html',
@@ -25,8 +25,9 @@ self.addEventListener('activate', (e) => {
 
 // Fetch: serve from cache, fall back to network
 self.addEventListener('fetch', (e) => {
-  // Don't cache API calls (Google Sheets sync)
+  // Don't cache API calls (Google Sheets sync, Anthropic API)
   if (e.request.url.includes('script.google.com')) return;
+  if (e.request.url.includes('anthropic.com')) return;
 
   e.respondWith(
     caches.match(e.request).then(cached => {
