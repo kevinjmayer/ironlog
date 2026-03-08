@@ -1921,7 +1921,7 @@ async function callClaude(systemPrompt, userMessage, opts = {}) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: opts.model || 'claude-sonnet-4-20250514',
+      model: opts.model || 'claude-sonnet-4-6-20250415',
       max_tokens: opts.maxTokens || 1024,
       system: systemPrompt,
       messages: Array.isArray(userMessage) ? userMessage : [{ role: 'user', content: userMessage }],
