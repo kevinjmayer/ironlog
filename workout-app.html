@@ -519,7 +519,8 @@
       <button class="btn btn-sm btn-secondary btn-block" onclick="document.getElementById('importInput').click()">Import Data (JSON)</button>
       <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
     </div>
-    <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="closeSettings()">Close</button>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v2.1</div>
+    <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="closeSettings()">Close</button>
   </div>
 </div>
 
@@ -814,7 +815,11 @@ function getLastWorkoutForExercise(exerciseName) {
   for (let i = state.workouts.length - 1; i >= 0; i--) {
     const w = state.workouts[i];
     const ex = w.exercises.find(e => e.name === exerciseName);
-    if (ex) return ex;
+    if (ex) {
+      // Attach session-level notes so progression logic can check them too
+      ex._sessionNotes = w.notes || '';
+      return ex;
+    }
   }
   return null;
 }
@@ -831,12 +836,41 @@ function getTargetForExercise(template) {
     };
   }
 
+  // Determine effective weight (use last set's weight if per-set weights were used)
+  let effectiveWeight = last.weight;
+  const lastSetWeight = last.sets[last.sets.length - 1]?.weight;
+  if (lastSetWeight !== undefined && lastSetWeight !== last.weight) {
+    effectiveWeight = lastSetWeight; // They dropped weight — use the lower value
+  }
+
+  // Check notes for manual override keywords
+  const noteText = ((last.note || '') + ' ' + (last._sessionNotes || '')).toLowerCase();
+  const wantDeload = /\b(go down|drop weight|too heavy|deload|lower weight|reduce weight|back off|ease up)\b/i.test(noteText);
+  const wantIncrease = /\b(go up|raise weight|add weight|increase weight|too easy|too light)\b/i.test(noteText);
+
+  if (wantDeload && template.increment) {
+    const deload = Math.round(effectiveWeight * 0.9 / 5) * 5;
+    return {
+      weight: deload,
+      targetReps: template.minReps,
+      note: `Deload to ${deload} lbs — per your notes last session`
+    };
+  }
+
+  if (wantIncrease && template.increment) {
+    return {
+      weight: effectiveWeight + template.increment,
+      targetReps: template.minReps,
+      note: `+${template.increment} lbs — per your notes last session`
+    };
+  }
+
   // Check if all sets hit maxReps
   const allMaxed = last.sets.every(s => s.reps >= template.maxReps);
 
   if (allMaxed && template.increment) {
     return {
-      weight: last.weight + template.increment,
+      weight: effectiveWeight + template.increment,
       targetReps: template.minReps,
       note: `+${template.increment} lbs — you hit ${template.maxReps} on all sets!`
     };
@@ -845,7 +879,7 @@ function getTargetForExercise(template) {
   // Check if failed badly (couldn't hit minReps on most sets)
   const failedSets = last.sets.filter(s => s.reps < template.minReps).length;
   if (failedSets >= 2 && template.increment) {
-    const deload = Math.round(last.weight * 0.9 / 5) * 5;
+    const deload = Math.round(effectiveWeight * 0.9 / 5) * 5;
     return {
       weight: deload,
       targetReps: template.minReps,
@@ -856,7 +890,7 @@ function getTargetForExercise(template) {
   // Otherwise keep same weight, try for more reps
   const avgReps = Math.round(last.sets.reduce((s, x) => s + x.reps, 0) / last.sets.length);
   return {
-    weight: last.weight,
+    weight: effectiveWeight,
     targetReps: Math.min(avgReps + 1, template.maxReps),
     note: `Same weight — aim for ${Math.min(avgReps + 1, template.maxReps)} reps (last avg: ${avgReps})`
   };
@@ -1305,7 +1339,7 @@ function renderHistory() {
       <div class="card history-item" onclick="showWorkoutDetail(${w.id})">
         <div class="history-date">
           <span class="day-badge ${dayClass}">${w.dayLabel}</span>
-          ${formatDate(new Date(w.date))}
+          ${formatDate(parseLocalDate(w.date))}
           <span style="color:var(--text2);font-size:12px;margin-left:auto">${w.duration || '?'} min</span>
         </div>
         <div class="history-exercises">
@@ -1329,7 +1363,7 @@ function showWorkoutDetail(id) {
   const modal = document.getElementById('settingsModal');
   const content = modal.querySelector('.modal');
 
-  let html = `<div class="modal-title">${w.dayLabel} — ${formatDate(new Date(w.date))}</div>`;
+  let html = `<div class="modal-title">${w.dayLabel} — ${formatDate(parseLocalDate(w.date))}</div>`;
 
   w.exercises.forEach(ex => {
     const hasVaryingWeights = ex.sets.some(s => s.weight !== undefined && s.weight !== ex.weight);
@@ -1504,14 +1538,14 @@ function drawChart(canvasId, data) {
   for (let i = 0; i < numLabels; i++) {
     const idx = Math.round(i * (data.length - 1) / Math.max(numLabels - 1, 1));
     const x = pad.left + (idx / Math.max(data.length - 1, 1)) * plotW;
-    const d = new Date(data[idx].date);
+    const d = parseLocalDate(data[idx].date);
     const label = (d.getMonth() + 1) + '/' + d.getDate();
     ctx.fillText(label, x, h - pad.bottom + 14);
   }
   // Year labels for first and last
   if (data.length > 1) {
-    const firstDate = new Date(data[0].date);
-    const lastDate = new Date(data[data.length-1].date);
+    const firstDate = parseLocalDate(data[0].date);
+    const lastDate = parseLocalDate(data[data.length-1].date);
     ctx.font = '8px system-ui';
     ctx.fillStyle = '#475569';
     const x0 = pad.left;
@@ -1552,13 +1586,13 @@ function getWorkoutsThisWeek() {
   const weekStart = new Date(now);
   weekStart.setDate(now.getDate() - now.getDay());
   weekStart.setHours(0,0,0,0);
-  return state.workouts.filter(w => new Date(w.date) >= weekStart).length;
+  return state.workouts.filter(w => parseLocalDate(w.date) >= weekStart).length;
 }
 
 function getWorkoutsThisMonth() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  return state.workouts.filter(w => new Date(w.date) >= monthStart).length;
+  return state.workouts.filter(w => parseLocalDate(w.date) >= monthStart).length;
 }
 
 // ============================================================
@@ -1921,7 +1955,7 @@ async function callClaude(systemPrompt, userMessage, opts = {}) {
       'content-type': 'application/json',
     },
     body: JSON.stringify({
-      model: opts.model || 'claude-sonnet-4-6-20250415',
+      model: opts.model || 'claude-sonnet-4-6',
       max_tokens: opts.maxTokens || 1024,
       system: systemPrompt,
       messages: Array.isArray(userMessage) ? userMessage : [{ role: 'user', content: userMessage }],
@@ -2314,6 +2348,13 @@ function formatDate(d) {
   return `${days[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`;
 }
 
+// Parse "YYYY-MM-DD" as LOCAL date (not UTC).
+// new Date("2026-03-29") gives UTC midnight = Mar 28 5pm Mountain. This fixes that.
+function parseLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
 // Local date string (YYYY-MM-DD) — uses device timezone, not UTC
 function localDateStr(d) {
   d = d || new Date();
@@ -2420,7 +2461,7 @@ function importHistoricalData() {
     });
 
     state.workouts.push({
-      id: new Date(date).getTime() + Math.random() * 1000,
+      id: parseLocalDate(date).getTime() + Math.random() * 1000,
       date: date,
       day: day,
       dayLabel: dayLabel,
