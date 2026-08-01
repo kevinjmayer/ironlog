@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ironlog-v6';
+const CACHE_NAME = 'ironlog-v8';
 const ASSETS = [
   './',
   './workout-app.html',
