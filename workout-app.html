@@ -624,7 +624,7 @@
       <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
       <button class="btn btn-sm btn-block" style="background:var(--surface2);color:var(--red)" onclick="undoLastWorkout()">Remove Last Workout</button>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v3.4</div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v3.5</div>
     <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="closeSettings()">Close</button>
   </div>
 </div>
@@ -2024,11 +2024,17 @@ function renderHistory() {
   const sorted = [...state.workouts].reverse();
   sorted.forEach(w => {
     const dayClass = w.day === 'dayA' ? 'day-a' : 'day-b';
+    const marks = [];
+    if (w.prs && w.prs.length) marks.push(`<span title="Personal record">🏆</span>`);
+    if (w.exercises.some(e => e.niggle)) marks.push(`<span title="Niggle flagged">${NIGGLE_LEVELS[Math.max(...w.exercises.filter(e => e.niggle).map(e => e.niggle.level || 1))]}</span>`);
+    if (w.aiAnalysis) marks.push(`<span title="Coach feedback available" style="color:var(--green)">💬</span>`);
+
     html += `
       <div class="card history-item" onclick="showWorkoutDetail(${w.id})">
         <div class="history-date">
-          <span class="day-badge ${dayClass}">${w.dayLabel}</span>
+          <span class="day-badge ${dayClass}">${esc(w.dayLabel)}</span>
           ${formatDate(parseLocalDate(w.date))}
+          ${marks.length ? `<span style="font-size:12px;margin-left:6px">${marks.join(' ')}</span>` : ''}
           <span style="color:var(--text2);font-size:12px;margin-left:auto">${w.duration || '?'} min</span>
         </div>
         <div class="history-exercises">
@@ -2038,6 +2044,11 @@ function renderHistory() {
       const repsStr = ex.sets.map(s => s.reps).join('/');
       html += `${esc(ex.name)}: ${repsStr} @ ${esc(ex.weight)} lbs<br>`;
     });
+
+    if (w.aiAnalysis) {
+      const snippet = w.aiAnalysis.replace(/\s+/g, ' ').trim().slice(0, 90);
+      html += `<div style="margin-top:6px;font-size:12px;color:var(--green);font-style:italic">${esc(snippet)}${w.aiAnalysis.length > 90 ? '…' : ''}</div>`;
+    }
 
     html += `</div></div>`;
   });
@@ -2074,8 +2085,12 @@ function showWorkoutDetail(id) {
     html += `<div style="margin-top:12px;font-size:13px;color:var(--text2)">${esc(w.notes)}</div>`;
   }
 
+  // Coach feedback, captured at the time the workout was finished
   if (w.aiAnalysis) {
-    html += `<div class="ai-card" style="margin-top:12px"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${escapeHtml(w.aiAnalysis)}</div></div>`;
+    html += `<div class="ai-card" style="margin-top:12px">
+      <div class="ai-card-title">AI Coach Analysis</div>
+      <div class="ai-card-body">${escapeHtml(w.aiAnalysis)}</div>
+    </div>`;
   }
 
   html += `<button class="btn btn-secondary btn-block" style="margin-top:16px" onclick="editWorkout(${w.id})">Edit This Workout</button>`;
@@ -3534,6 +3549,7 @@ Keep it brief and practical. Use plain text, no markdown headers.`;
       state.workouts[idx].aiAnalysis = analysis;
       save();
       scheduleBackup(); // debounced — gets the analysis into the Sessions sheet
+      renderHistory();  // so the feedback marker appears right away
     }
 
     analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${escapeHtml(analysis)}</div></div>`;
