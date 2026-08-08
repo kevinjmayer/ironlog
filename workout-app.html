@@ -678,7 +678,7 @@
       <div id="integrityResult" style="font-size:12px;margin-bottom:8px;display:none;line-height:1.5"></div>
       <button class="btn btn-sm btn-block" style="background:var(--surface2);color:var(--red)" onclick="undoLastWorkout()">Remove Last Workout</button>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v4.0</div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v4.1</div>
     <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="closeSettings()">Close</button>
   </div>
 </div>
@@ -2370,7 +2370,7 @@ function showWorkoutDetail(id) {
   if (w.aiAnalysis) {
     html += `<div class="ai-card" style="margin-top:12px">
       <div class="ai-card-title">AI Coach Analysis</div>
-      <div class="ai-card-body">${escapeHtml(w.aiAnalysis)}</div>
+      <div class="ai-card-body">${renderMarkdown(w.aiAnalysis)}</div>
     </div>`;
   }
 
@@ -3024,7 +3024,7 @@ function renderProgress() {
       </div>
       <div id="programReviewBody">
         ${review
-          ? `<div class="ai-card-body">${escapeHtml(review.text)}</div>
+          ? `<div class="ai-card-body">${renderMarkdown(review.text)}</div>
              <div style="font-size:11px;color:var(--text-dim);margin-top:8px">${new Date(review.ts).toLocaleDateString()}</div>`
           : `<div style="font-size:13px;color:var(--text2)">Get a read on what's progressing, what's stalled, and what to change next month.</div>`}
       </div>
@@ -4141,7 +4141,7 @@ Reply with one short sentence per problem, max 3. If everything looks reasonable
     el.innerHTML = staticHtml + `
       <div class="advisory-card">
         <div class="advisory-title">Check These Targets</div>
-        <div class="advisory-body">${escapeHtml(reply.trim())}</div>
+        <div class="advisory-body">${renderMarkdown(reply.trim())}</div>
         <div style="font-size:11px;color:var(--text-dim);margin-top:6px">Advisory only — your targets are unchanged.</div>
       </div>`;
   } catch (err) {
@@ -4243,7 +4243,7 @@ Be specific and use their actual numbers. Under 250 words. Plain text, no markdo
       { maxTokens: 32000 });
     state.lastProgramReview = { ts: now, text: reply };
     save();
-    if (el) el.innerHTML = `<div class="ai-card-body">${escapeHtml(reply)}</div>
+    if (el) el.innerHTML = `<div class="ai-card-body">${renderMarkdown(reply)}</div>
       <div style="font-size:11px;color:var(--text-dim);margin-top:8px">${new Date(now).toLocaleDateString()}</div>`;
   } catch (err) {
     if (el) el.innerHTML = `<div style="color:var(--red);font-size:13px">${escapeHtml(err.message)}</div>`;
@@ -4339,17 +4339,84 @@ Keep it brief and practical. Use plain text, no markdown headers.`;
       renderHistory();  // so the feedback marker appears right away
     }
 
-    analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${escapeHtml(analysis)}</div></div>`;
+    analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${renderMarkdown(analysis)}</div></div>`;
   } catch (err) {
     analysisEl.innerHTML = `<div class="ai-card" style="border-left-color:var(--red)"><div class="ai-card-title" style="color:var(--red)">Analysis Error</div><div class="ai-card-body" style="color:var(--text2)">${escapeHtml(err.message)}</div></div>`;
   }
 }
 
-// Multi-line display (AI analysis, chat) — preserves line breaks
+// Multi-line display — preserves line breaks. Used for plain text such as
+// error messages, where markdown shouldn't be interpreted.
 function escapeHtml(str) {
   return String(str == null ? '' : str)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/"/g,'&quot;').replace(/'/g,'&#39;').replace(/\n/g,'<br>');
+}
+
+// Renders the small markdown subset the model actually uses.
+//
+// Order matters for safety: the text is HTML-escaped FIRST, so by the time
+// the markdown patterns run they're operating on inert text and the only
+// tags that can exist are the ones produced here. Model output is never
+// trusted as HTML.
+function renderMarkdown(str) {
+  let t = String(str == null ? '' : str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+  // Fenced blocks and inline code first, so markers inside them stay literal
+  const code = [];
+  t = t.replace(/```([\s\S]*?)```/g, (m, c) => {
+    code.push(`<pre style="background:var(--bg);padding:8px;border-radius:6px;overflow-x:auto;font-size:12px;margin:6px 0">${c.trim()}</pre>`);
+    return `@@ILCODE${code.length - 1}@@`;
+  });
+  t = t.replace(/`([^`\n]+)`/g, (m, c) => {
+    code.push(`<code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:0.92em">${c}</code>`);
+    return `@@ILCODE${code.length - 1}@@`;
+  });
+
+  // Headings -> bold lines (the coach shouldn't be emitting these, but if it
+  // does they should read as emphasis rather than literal hashes)
+  t = t.replace(/^#{1,6}\s+(.+)$/gm, '<strong>$1</strong>');
+
+  // Bold before italic, so ** isn't consumed by the single-* pattern
+  t = t.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+  t = t.replace(/__([^_\n]+)__/g, '<strong>$1</strong>');
+  t = t.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s.,;:!?)]|$)/g, '$1<em>$2</em>');
+  t = t.replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/g, '$1<em>$2</em>');
+
+  // Lists: group consecutive bullet or numbered lines
+  const lines = t.split('\n');
+  const out = [];
+  let list = null; // 'ul' | 'ol'
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+
+  lines.forEach(line => {
+    const bullet = line.match(/^\s*[-*+]\s+(.*)$/);
+    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (bullet) {
+      if (list !== 'ul') { closeList(); out.push('<ul style="margin:4px 0 4px 18px;padding:0">'); list = 'ul'; }
+      out.push(`<li style="margin:2px 0">${bullet[1]}</li>`);
+    } else if (numbered) {
+      if (list !== 'ol') { closeList(); out.push('<ol style="margin:4px 0 4px 20px;padding:0">'); list = 'ol'; }
+      out.push(`<li style="margin:2px 0">${numbered[1]}</li>`);
+    } else {
+      closeList();
+      out.push(line);
+    }
+  });
+  closeList();
+
+  // Remaining newlines become breaks, but not around block-level tags we just
+  // emitted — otherwise lists gain blank gaps
+  t = out.join('\n')
+    .replace(/\n(?=<\/?(?:ul|ol|li|pre)\b)/g, '')
+    .replace(/(<\/(?:ul|ol|pre)>)\n/g, '$1')
+    .replace(/\n/g, '<br>');
+
+  // Restore code placeholders
+  t = t.replace(/@@ILCODE(\d+)@@/g, (m, i) => code[Number(i)]);
+  return t;
 }
 
 // Single-line text and attribute values. Notes routinely contain quotes,
@@ -4401,7 +4468,7 @@ function renderCoach() {
     </div>`;
   } else {
     state.chatHistory.forEach(msg => {
-      html += `<div class="chat-msg ${msg.role}">${escapeHtml(msg.content)}</div>`;
+      html += `<div class="chat-msg ${msg.role}">${renderMarkdown(msg.content)}</div>`;
     });
   }
 
@@ -4534,7 +4601,7 @@ function renderMiniChat() {
       </div>`;
     } else {
       recent.forEach(m => {
-        html += `<div class="chat-msg ${m.role}" style="font-size:13px;padding:8px 10px">${escapeHtml(m.content)}</div>`;
+        html += `<div class="chat-msg ${m.role}" style="font-size:13px;padding:8px 10px">${renderMarkdown(m.content)}</div>`;
       });
     }
     html += `</div>`;
