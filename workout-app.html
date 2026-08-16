@@ -627,7 +627,11 @@
       </div>
 
       <button class="btn btn-sm btn-secondary btn-block" style="margin-top:10px" onclick="testAIConnection()">Test AI Connection</button>
-      <div id="aiTestStatus" style="font-size:12px;margin-top:6px;display:none;line-height:1.5"></div>
+      <div id="aiTestStatus" style="font-size:12px;margin-top:6px;display:none;line-height:1.6"></div>
+      <button class="btn btn-sm btn-secondary btn-block" style="margin-top:8px" onclick="resetAppCache()">Reset App Cache</button>
+      <p style="font-size:11px;color:var(--text-dim);margin:6px 0 0;line-height:1.4">
+        Clears the cached app shell and unregisters the service worker. Workouts, key and settings are untouched.
+      </p>
 
       <p style="font-size:11px;color:var(--text-dim);margin:10px 0 0;line-height:1.4">
         Your key is stored only on this device and never leaves it except to reach Anthropic.
@@ -678,7 +682,7 @@
       <div id="integrityResult" style="font-size:12px;margin-bottom:8px;display:none;line-height:1.5"></div>
       <button class="btn btn-sm btn-block" style="background:var(--surface2);color:var(--red)" onclick="undoLastWorkout()">Remove Last Workout</button>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v4.1</div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v4.2</div>
     <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="closeSettings()">Close</button>
   </div>
 </div>
@@ -2366,13 +2370,24 @@ function showWorkoutDetail(id) {
       <strong style="color:var(--text)">Recovery:</strong> ${esc(recoverySummary(w.recovery))}</div>`;
   }
 
-  // Coach feedback, captured at the time the workout was finished
+  // Coach feedback. Shown if captured at the time; otherwise offered, since
+  // older sessions predate the feature.
+  html += `<div id="detailAIslot">`;
   if (w.aiAnalysis) {
     html += `<div class="ai-card" style="margin-top:12px">
-      <div class="ai-card-title">AI Coach Analysis</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div class="ai-card-title" style="margin:0">AI Coach Analysis</div>
+        <button class="btn btn-sm btn-secondary" style="font-size:11px;padding:3px 8px"
+          onclick="analyzePastWorkout(${w.id})">Redo</button>
+      </div>
       <div class="ai-card-body">${renderMarkdown(w.aiAnalysis)}</div>
     </div>`;
+  } else if (getApiKey()) {
+    html += `<button class="btn btn-secondary btn-block" style="margin-top:12px" onclick="analyzePastWorkout(${w.id})">
+      Get coach feedback on this workout
+    </button>`;
   }
+  html += `</div>`;
 
   html += `<button class="btn btn-secondary btn-block" style="margin-top:16px" onclick="editWorkout(${w.id})">Edit This Workout</button>`;
   html += `<button class="btn btn-primary btn-block" style="margin-top:8px" onclick="closeDetail()">Close</button>`;
@@ -2382,6 +2397,14 @@ function showWorkoutDetail(id) {
 }
 
 function closeDetail() { closeModal('detailModal'); }
+
+// Generate feedback for a session that never got any
+function analyzePastWorkout(id) {
+  const w = state.workouts.find(x => x.id === id);
+  if (!w) return;
+  if (!getApiKey()) { alert('Add your Anthropic API key in Settings first.'); return; }
+  analyzeWorkout(w, { retro: true });
+}
 
 // ============================================================
 // RECOVERY (sauna / cold plunge)
@@ -3924,35 +3947,114 @@ function renderModelSettings() {
   }
 }
 
+// Walks the stack one layer at a time so a failure points at a cause
+// instead of a bare "Failed to fetch", which covers everything from an
+// offline phone to a service worker eating the request.
 async function testAIConnection() {
   const el = document.getElementById('aiTestStatus');
   if (!el) return;
   el.style.display = 'block';
   el.style.color = 'var(--text-dim)';
-  el.textContent = 'Testing…';
+  el.innerHTML = 'Running checks…';
 
-  if (!getApiKey()) {
-    el.style.color = 'var(--red)';
-    el.textContent = 'No API key saved.';
+  const lines = [];
+  const push = (ok, txt) => {
+    lines.push(`<div style="color:${ok ? 'var(--green)' : 'var(--red)'}">${ok ? '✓' : '✗'} ${txt}</div>`);
+    el.innerHTML = lines.join('');
+  };
+  const note = txt => {
+    lines.push(`<div style="color:var(--text-dim);font-size:11px;margin:4px 0 0">${txt}</div>`);
+    el.innerHTML = lines.join('');
+  };
+
+  // 1. Device connectivity
+  if (!navigator.onLine) {
+    push(false, 'Device reports it is offline');
+    note('Reconnect and try again.');
+    return;
+  }
+  push(true, 'Device online');
+
+  // 2. Is a service worker sitting in front of requests?
+  let swInfo = 'none';
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      swInfo = 'active';
+      const ver = await new Promise(resolve => {
+        const ch = new MessageChannel();
+        const timer = setTimeout(() => resolve(null), 1200);
+        ch.port1.onmessage = ev => { clearTimeout(timer); resolve(ev.data && ev.data.cache); };
+        try {
+          navigator.serviceWorker.controller.postMessage({ type: 'VERSION' }, [ch.port2]);
+        } catch (e) { clearTimeout(timer); resolve(null); }
+      });
+      swInfo = ver || 'active (version unknown — likely an old one)';
+    }
+    push(true, `Service worker: ${swInfo}`);
+    if (swInfo !== 'none' && !/^ironlog-v(1[2-9]|[2-9]\d)/.test(String(swInfo))) {
+      note('That is an older service worker. Old versions could intercept API calls and turn them into "Failed to fetch". Use Reset App Cache below, then reload twice.');
+    }
+  } catch (e) {
+    push(true, 'Service worker: could not query');
+  }
+
+  // 3. API key present
+  if (!getApiKey()) { push(false, 'No API key saved'); return; }
+  push(true, 'API key present');
+
+  // 4. Can we reach Anthropic at all? A plain GET has the smallest surface.
+  let t0 = Date.now();
+  try {
+    await listModels();
+    push(true, `Reached api.anthropic.com (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
+  } catch (e) {
+    const ms = ((Date.now() - t0) / 1000).toFixed(1);
+    push(false, `Could not reach api.anthropic.com after ${ms}s`);
+    note(esc(e.message));
+    if (/failed to fetch|networkerror|load failed/i.test(e.message)) {
+      note('A "failed to fetch" this fast means the request was blocked before leaving the device — usually a stale service worker, a VPN or content blocker, or a network that filters the domain. Try Reset App Cache, then a different network to rule out filtering.');
+    } else if (/401|authentication/i.test(e.message)) {
+      note('The key was rejected. Re-paste it — keys are easy to truncate on mobile.');
+    } else if (/credit|billing|quota/i.test(e.message)) {
+      note('Reached Anthropic fine, but the account needs credit.');
+    }
     return;
   }
 
-  const t0 = Date.now();
+  // 5. The actual call the app makes
+  t0 = Date.now();
   try {
-    const r = await callClaude(
-      'Reply with exactly: OK',
-      'Say OK.',
-      { maxTokens: 4000, wantUsage: true }
-    );
-    const ms = Date.now() - t0;
+    const r = await callClaude('Reply with exactly: OK', 'Say OK.',
+      { maxTokens: 4000, wantUsage: true });
+    const ms = ((Date.now() - t0) / 1000).toFixed(1);
+    push(true, `Coach responded in ${ms}s`);
     const u = r.usage || {};
-    el.style.color = 'var(--green)';
-    el.innerHTML = `Connected in ${(ms / 1000).toFixed(1)}s<br>
-      <span style="color:var(--text-dim)">model: ${esc(r.model)} · in ${u.input_tokens ?? '?'} / out ${u.output_tokens ?? '?'} tokens</span>`;
+    note(`model ${esc(r.model)} · in ${u.input_tokens ?? '?'} / out ${u.output_tokens ?? '?'} tokens`);
   } catch (e) {
-    el.style.color = 'var(--red)';
-    el.innerHTML = `Failed after ${((Date.now() - t0) / 1000).toFixed(1)}s<br>
-      <span style="color:var(--text-dim)">${esc(e.message)}</span>`;
+    push(false, `Message call failed after ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    note(esc(e.message));
+    note('Listing models worked but sending a message did not — that points at the request body or token ceiling rather than the network.');
+  }
+}
+
+// Escape hatch: unregister every service worker and drop all caches. Purely
+// app-shell state — workouts, keys and settings all live in localStorage and
+// are untouched.
+async function resetAppCache() {
+  if (!confirm('Clear the app cache and unregister the service worker?\n\nYour workouts, API key and settings are NOT affected. The app will reload.')) return;
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(r => r.unregister()));
+    }
+    if (window.caches) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map(k => caches.delete(k)));
+    }
+    alert('Cache cleared. The app will reload now — you may need to reload once more for the new version to take effect.');
+    location.reload(true);
+  } catch (e) {
+    alert('Could not fully clear: ' + e.message);
   }
 }
 
@@ -4250,13 +4352,17 @@ Be specific and use their actual numbers. Under 250 words. Plain text, no markdo
   }
 }
 
-// Build a summary of recent workouts for AI context
-function buildWorkoutContext(days = 90) {
-  const cutoff = new Date();
+// Build a summary of recent workouts for AI context.
+// `beforeDate` caps the window at that date, so analysing an older session
+// doesn't quote sessions that hadn't happened yet.
+function buildWorkoutContext(days = 90, beforeDate = null) {
+  const anchor = beforeDate ? parseLocalDate(beforeDate) : new Date();
+  const cutoff = new Date(anchor);
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = localDateStr(cutoff);
+  const upper = beforeDate || localDateStr(new Date());
 
-  const recent = state.workouts.filter(w => w.date >= cutoffStr);
+  const recent = state.workouts.filter(w => w.date >= cutoffStr && w.date <= upper);
   if (recent.length === 0) return 'No workout data in the last ' + days + ' days.';
 
   let summary = `Workout history (last ${days} days, ${recent.length} sessions).\n`;
@@ -4294,15 +4400,20 @@ function buildProgramContext() {
 }
 
 // Post-workout analysis
-async function analyzeWorkout(workout) {
+async function analyzeWorkout(workout, opts = {}) {
   const apiKey = getApiKey();
   if (!apiKey) return;
 
-  const analysisEl = document.getElementById('postWorkoutAI');
+  // `retro` renders into the history detail modal for a session that never
+  // got feedback at the time, and limits context to what had happened by then.
+  const retro = !!opts.retro;
+  const analysisEl = document.getElementById(retro ? 'detailAIslot' : 'postWorkoutAI');
   if (!analysisEl) return;
-  analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-loading">Analyzing your workout<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div></div>`;
+  analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-loading">${retro ? 'Looking back at this session' : 'Analyzing your workout'}<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div></div>`;
 
-  const systemPrompt = `You are a knowledgeable, supportive strength coach. The user just completed a workout. Analyze it in the context of their recent history. Be concise: 3-5 bullet points max. Focus on:
+  const systemPrompt = `You are a knowledgeable, supportive strength coach. ${retro
+    ? 'The user is reviewing a past workout. Everything shown happened on or before that date — do not speculate about sessions after it.'
+    : 'The user just completed a workout.'} Analyze it in the context of their recent history. Be concise: 3-5 bullet points max. Focus on:
 - Progress trends (weight/rep improvements or stalls)
 - Any body-area niggle they flagged, especially one that has come up before
 - Form or volume concerns based on their notes
@@ -4322,7 +4433,7 @@ Keep it brief and practical. Use plain text, no markdown headers.`;
     (workout.prs && workout.prs.length ? `\nPRs set: ${workout.prs.join(', ')}` : '') +
     (workout.notes ? `\nSession notes: ${workout.notes}` : '');
 
-  const context = buildWorkoutContext(90);
+  const context = buildWorkoutContext(90, retro ? workout.date : null);
   const program = buildProgramContext();
   const niggles = buildNiggleContext(90);
 
