@@ -628,6 +628,7 @@
 
       <button class="btn btn-sm btn-secondary btn-block" style="margin-top:10px" onclick="testAIConnection()">Test AI Connection</button>
       <div id="aiTestStatus" style="font-size:12px;margin-top:6px;display:none;line-height:1.6"></div>
+      <div id="aiQueueStatus" style="font-size:12px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
       <button class="btn btn-sm btn-secondary btn-block" style="margin-top:8px" onclick="resetAppCache()">Reset App Cache</button>
       <p style="font-size:11px;color:var(--text-dim);margin:6px 0 0;line-height:1.4">
         Clears the cached app shell and unregisters the service worker. Workouts, key and settings are untouched.
@@ -682,7 +683,7 @@
       <div id="integrityResult" style="font-size:12px;margin-bottom:8px;display:none;line-height:1.5"></div>
       <button class="btn btn-sm btn-block" style="background:var(--surface2);color:var(--red)" onclick="undoLastWorkout()">Remove Last Workout</button>
     </div>
-    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v4.2</div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-dim)">Iron Log v4.3</div>
     <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="closeSettings()">Close</button>
   </div>
 </div>
@@ -1275,6 +1276,7 @@ let state = {
   lastProgramReview: null,
   miniChatOpen: false,   // in-workout coach panel
   recoveryLogs: [],      // standalone sauna/cold entries (rest days)
+  pendingAI: [],         // AI work deferred by a network failure
   deloadDismissedAt: null,
 };
 
@@ -3363,6 +3365,7 @@ function showSettings() {
   const syncEl = document.getElementById('syncStatus');
   if (syncEl) syncEl.style.display = 'none';
   renderBackupHealth();
+  renderSettingsQueue();
   const tokEl = document.getElementById('sheetsTokenText');
   if (tokEl) tokEl.textContent = getSheetsToken();
   const intEl = document.getElementById('integrityResult');
@@ -3831,7 +3834,7 @@ function activeModel() {
 async function listModels() {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('No API key configured');
-  const res = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+  const res = await fetchWithTimeout('https://api.anthropic.com/v1/models?limit=100', {
     headers: {
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01',
@@ -4058,12 +4061,55 @@ async function resetAppCache() {
   }
 }
 
+// A blocked network fails instantly; a stalled one can hang forever. Both
+// need bounding, since this often runs on gym wifi.
+const AI_TIMEOUT_MS = 90000;
+
+async function fetchWithTimeout(url, init, ms = AI_TIMEOUT_MS) {
+  const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl ? setTimeout(() => ctrl.abort(), ms) : null;
+  try {
+    return await fetch(url, ctrl ? { ...init, signal: ctrl.signal } : init);
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      throw new Error(`Timed out after ${Math.round(ms / 1000)}s — the network may be blocking or throttling the request.`);
+    }
+    throw e;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// Only worth retrying things that might resolve on their own. A bad key or an
+// empty balance will fail identically every time, so retrying just wastes
+// time and money.
+function isRetryable(err) {
+  const m = String((err && err.message) || '');
+  if (/failed to fetch|networkerror|load failed|timed out|network request failed/i.test(m)) return true;
+  if (/^(408|429|500|502|503|504)\b/.test(m)) return true;
+  return false;
+}
+
+async function withRetry(fn, attempts = 3) {
+  let last;
+  for (let i = 0; i < attempts; i++) {
+    try { return await fn(); }
+    catch (e) {
+      last = e;
+      if (!isRetryable(e) || i === attempts - 1) throw e;
+      // 1s, then 3s — short enough to still feel responsive
+      await new Promise(r => setTimeout(r, 1000 * Math.pow(3, i)));
+    }
+  }
+  throw last;
+}
+
 async function callClaude(systemPrompt, userMessage, opts = {}) {
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('No API key configured');
 
   const model = opts.model || activeModel();
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -4123,7 +4169,7 @@ async function callClaude(systemPrompt, userMessage, opts = {}) {
 // Note parsing returns a small JSON object; 4k is ample.
 const NOTE_INTENT_TOKENS = 4000;
 
-async function interpretWorkoutNotes(workout) {
+async function interpretWorkoutNotes(workout, opts = {}) {
   if (!getApiKey()) return null;
 
   const noted = workout.exercises.filter(ex => (ex.note || '').trim());
@@ -4157,9 +4203,9 @@ ${noteBlock}
 Session note: ${(workout.notes || '(none)')}`;
 
   try {
-    const raw = await callClaude(systemPrompt, userMsg, {
+    const raw = await withRetry(() => callClaude(systemPrompt, userMsg, {
       maxTokens: NOTE_INTENT_TOKENS,
-    });
+    }));
     // Tolerate stray fences or surrounding text
     const match = raw.match(/\{[\s\S]*\}/);
     if (!match) return null;
@@ -4194,9 +4240,115 @@ Session note: ${(workout.notes || '(none)')}`;
     return Object.keys(clean).length ? clean : null;
   } catch (err) {
     console.error('Note interpretation failed:', err);
-    return null; // Progression falls back to mechanical rules
+    // Queue it — losing this silently would drop an instruction like
+    // "go to 185 next time" from the next session's target.
+    if (!opts.noQueue && isRetryable(err)) enqueueAI(workout.id, 'notes', err);
+    return null; // mechanical rules apply meanwhile
   }
 }
+
+// ---- Deferred AI work ----------------------------------------------------
+// Gym wifi frequently blocks or filters api.anthropic.com. Rather than losing
+// a workout's analysis to a single failure, failed work is queued and retried
+// when connectivity comes back. Note interpretation matters most here: losing
+// it silently would drop a "go to 185 next time" instruction.
+
+const AI_QUEUE_MAX_ATTEMPTS = 6;
+
+function enqueueAI(workoutId, kind, err) {
+  if (!Array.isArray(state.pendingAI)) state.pendingAI = [];
+  const existing = state.pendingAI.find(j => j.workoutId === workoutId && j.kind === kind);
+  if (existing) {
+    existing.attempts = (existing.attempts || 0) + 1;
+    existing.lastError = String((err && err.message) || err || '');
+    existing.at = Date.now();
+  } else {
+    state.pendingAI.push({
+      workoutId, kind, attempts: 1,
+      lastError: String((err && err.message) || err || ''),
+      at: Date.now(),
+    });
+  }
+  // Give up eventually rather than retrying forever
+  state.pendingAI = state.pendingAI.filter(j => j.attempts < AI_QUEUE_MAX_ATTEMPTS);
+  save();
+}
+
+function dequeueAI(workoutId, kind) {
+  if (!Array.isArray(state.pendingAI)) return;
+  state.pendingAI = state.pendingAI.filter(j => !(j.workoutId === workoutId && j.kind === kind));
+  save();
+}
+
+function pendingAICount() {
+  return (state.pendingAI || []).length;
+}
+
+let _drainingAI = false;
+
+async function drainAIQueue(manual) {
+  if (_drainingAI) return;
+  if (!getApiKey() || !navigator.onLine) return;
+  const jobs = (state.pendingAI || []).slice();
+  if (!jobs.length) return;
+
+  _drainingAI = true;
+  let done = 0;
+  for (const job of jobs) {
+    const w = state.workouts.find(x => x.id === job.workoutId);
+    if (!w) { dequeueAI(job.workoutId, job.kind); continue; }
+    try {
+      if (job.kind === 'notes') {
+        const intent = await interpretWorkoutNotes(w, { noQueue: true });
+        if (intent) {
+          const idx = state.workouts.findIndex(x => x.id === w.id);
+          if (idx >= 0) state.workouts[idx].noteIntent = intent;
+        }
+        dequeueAI(job.workoutId, job.kind);
+        done++;
+      } else if (job.kind === 'analysis') {
+        if (w.aiAnalysis) { dequeueAI(job.workoutId, job.kind); continue; }
+        const text = await runWorkoutAnalysis(w, false);
+        const idx = state.workouts.findIndex(x => x.id === w.id);
+        if (idx >= 0) state.workouts[idx].aiAnalysis = text;
+        dequeueAI(job.workoutId, job.kind);
+        done++;
+      }
+      save();
+    } catch (e) {
+      enqueueAI(job.workoutId, job.kind, e);
+      break; // still failing — stop hammering it
+    }
+  }
+  _drainingAI = false;
+
+  if (done > 0) {
+    scheduleBackup();
+    renderHistory();
+    renderToday();
+  }
+  if (manual) {
+    const left = pendingAICount();
+    alert(done
+      ? `Caught up on ${done} item${done === 1 ? '' : 's'}.` + (left ? ` ${left} still pending.` : '')
+      : (left ? 'Still could not reach the coach. Left queued for later.' : 'Nothing pending.'));
+    renderSettingsQueue();
+  }
+}
+
+function renderSettingsQueue() {
+  const el = document.getElementById('aiQueueStatus');
+  if (!el) return;
+  const n = pendingAICount();
+  if (!n) { el.innerHTML = '<span style="color:var(--text-dim)">Nothing waiting.</span>'; return; }
+  const worst = (state.pendingAI || [])[0] || {};
+  el.innerHTML = `<span style="color:var(--orange)">${n} item${n === 1 ? '' : 's'} waiting to reach the coach</span>` +
+    (worst.lastError ? `<div style="color:var(--text-dim);font-size:11px;margin-top:2px">last error: ${esc(worst.lastError)}</div>` : '') +
+    `<button class="btn btn-sm btn-secondary btn-block" style="margin-top:6px" onclick="drainAIQueue(true)">Retry now</button>`;
+}
+
+// Retry automatically when the connection returns
+window.addEventListener('online', () => { setTimeout(() => drainAIQueue(false), 1500); });
 
 // ---- Pre-workout sanity check --------------------------------------------
 // Advisory ONLY. Never blocks starting a workout and never changes a target.
@@ -4399,6 +4551,41 @@ function buildProgramContext() {
   return ctx;
 }
 
+function buildAnalysisSystemPrompt(retro) {
+  return `You are a knowledgeable, supportive strength coach. ${retro
+    ? 'The user is reviewing a past workout. Everything shown happened on or before that date — do not speculate about sessions after it.'
+    : 'The user just completed a workout.'} Analyze it in the context of their recent history. Be concise: 3-5 bullet points max. Focus on:
+- Progress trends (weight/rep improvements or stalls)
+- Any body-area niggle they flagged, especially one that has come up before
+- Form or volume concerns based on their notes
+- Specific, actionable suggestions
+- Encouragement where warranted
+If a niggle has appeared 3+ times in 90 days, lead with it and name a concrete adjustment. You are not diagnosing injuries; if something warrants a professional, say so briefly.
+Keep it brief and practical. Use plain text, no markdown headers.`;
+}
+
+function buildAnalysisWorkoutBlock(workout, retro) {
+  return `Just completed (${workout.dayLabel}, ${workout.date}, ${workout.duration}min` +
+    (workout.readiness ? `, readiness ${workout.readiness}/5` : '') +
+    (workout.sessionRating ? `, session rating ${workout.sessionRating}/5` : '') + `):\n` +
+    workout.exercises.map(ex => {
+      const reps = ex.sets.map(s => s.reps).join('/');
+      const nig = ex.niggle ? ` [NIGGLE: ${ex.niggle.area} — ${NIGGLE_LEVEL_NAMES[ex.niggle.level] || 'flagged'}]` : '';
+      return `${ex.name} (${ex.type}): ${reps} @ ${ex.weight || 'BW'} lbs${nig}${ex.note ? ` [${ex.note}]` : ''}`;
+    }).join('\n') +
+    (workout.prs && workout.prs.length ? `\nPRs set: ${workout.prs.join(', ')}` : '') +
+    (workout.notes ? `\nSession notes: ${workout.notes}` : '');
+}
+
+// Prompt assembly plus the call on their own, so the live path and the
+// retry queue run identical logic.
+async function runWorkoutAnalysis(workout, retro) {
+  return await callClaude(
+    buildAnalysisSystemPrompt(retro),
+    `${buildCoachContextBlock()}\n${buildProgramContext()}\n\n${buildNiggleContext(90)}\n\n${buildRecoveryContext(90)}\n\n${buildWorkoutContext(90, retro ? workout.date : null)}\n\n${buildAnalysisWorkoutBlock(workout, retro)}`
+  );
+}
+
 // Post-workout analysis
 async function analyzeWorkout(workout, opts = {}) {
   const apiKey = getApiKey();
@@ -4411,37 +4598,10 @@ async function analyzeWorkout(workout, opts = {}) {
   if (!analysisEl) return;
   analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-loading">${retro ? 'Looking back at this session' : 'Analyzing your workout'}<span class="dot">.</span><span class="dot">.</span><span class="dot">.</span></div></div>`;
 
-  const systemPrompt = `You are a knowledgeable, supportive strength coach. ${retro
-    ? 'The user is reviewing a past workout. Everything shown happened on or before that date — do not speculate about sessions after it.'
-    : 'The user just completed a workout.'} Analyze it in the context of their recent history. Be concise: 3-5 bullet points max. Focus on:
-- Progress trends (weight/rep improvements or stalls)
-- Any body-area niggle they flagged, especially one that has come up before
-- Form or volume concerns based on their notes
-- Specific, actionable suggestions
-- Encouragement where warranted
-If a niggle has appeared 3+ times in 90 days, lead with it and name a concrete adjustment. You are not diagnosing injuries; if something warrants a professional, say so briefly.
-Keep it brief and practical. Use plain text, no markdown headers.`;
-
-  const thisWorkout = `Just completed (${workout.dayLabel}, ${workout.date}, ${workout.duration}min` +
-    (workout.readiness ? `, readiness ${workout.readiness}/5` : '') +
-    (workout.sessionRating ? `, session rating ${workout.sessionRating}/5` : '') + `):\n` +
-    workout.exercises.map(ex => {
-      const reps = ex.sets.map(s => s.reps).join('/');
-      const nig = ex.niggle ? ` [NIGGLE: ${ex.niggle.area} — ${NIGGLE_LEVEL_NAMES[ex.niggle.level] || 'flagged'}]` : '';
-      return `${ex.name} (${ex.type}): ${reps} @ ${ex.weight || 'BW'} lbs${nig}${ex.note ? ` [${ex.note}]` : ''}`;
-    }).join('\n') +
-    (workout.prs && workout.prs.length ? `\nPRs set: ${workout.prs.join(', ')}` : '') +
-    (workout.notes ? `\nSession notes: ${workout.notes}` : '');
-
-  const context = buildWorkoutContext(90, retro ? workout.date : null);
-  const program = buildProgramContext();
-  const niggles = buildNiggleContext(90);
 
   try {
-    const analysis = await callClaude(systemPrompt,
-      `${buildCoachContextBlock()}\n${program}\n\n${niggles}\n\n${buildRecoveryContext(90)}\n\n${context}\n\n${thisWorkout}`);
+    const analysis = await withRetry(() => runWorkoutAnalysis(workout, retro));
 
-    // Store in workout
     const idx = state.workouts.findIndex(w => w.id === workout.id);
     if (idx >= 0) {
       state.workouts[idx].aiAnalysis = analysis;
@@ -4449,10 +4609,27 @@ Keep it brief and practical. Use plain text, no markdown headers.`;
       scheduleBackup(); // debounced — gets the analysis into the Sessions sheet
       renderHistory();  // so the feedback marker appears right away
     }
+    dequeueAI(workout.id, 'analysis');
 
     analysisEl.innerHTML = `<div class="ai-card"><div class="ai-card-title">AI Coach Analysis</div><div class="ai-card-body">${renderMarkdown(analysis)}</div></div>`;
   } catch (err) {
-    analysisEl.innerHTML = `<div class="ai-card" style="border-left-color:var(--red)"><div class="ai-card-title" style="color:var(--red)">Analysis Error</div><div class="ai-card-body" style="color:var(--text2)">${escapeHtml(err.message)}</div></div>`;
+    const network = isRetryable(err);
+    if (network) enqueueAI(workout.id, 'analysis', err);
+    analysisEl.innerHTML = network
+      ? `<div class="ai-card" style="border-left-color:var(--orange)">
+           <div class="ai-card-title" style="color:var(--orange)">Coach unreachable — queued</div>
+           <div class="ai-card-body" style="color:var(--text2)">
+             Your workout is saved. This will retry by itself once you're on a working connection.
+             <div style="font-size:11px;color:var(--text-dim);margin-top:6px">
+               ${esc(err.message)}<br>
+               Some wifi networks block api.anthropic.com — mobile data usually works.
+             </div>
+           </div>
+         </div>`
+      : `<div class="ai-card" style="border-left-color:var(--red)">
+           <div class="ai-card-title" style="color:var(--red)">Analysis Error</div>
+           <div class="ai-card-body" style="color:var(--text2)">${escapeHtml(err.message)}</div>
+         </div>`;
   }
 }
 
@@ -5057,6 +5234,9 @@ resumeTimerIfRunning();
 if (navigator.onLine && localStorage.getItem('ironlog-backup-pending') === '1') {
   autoBackup();
 }
+
+// Pick up any AI work a bad connection left behind
+setTimeout(() => drainAIQueue(false), 2000);
 
 // Register service worker for PWA / offline support
 if ('serviceWorker' in navigator) {
